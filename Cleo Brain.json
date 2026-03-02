@@ -1,0 +1,3444 @@
+{
+  "name": "Cleo Brain",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -1296,
+        544
+      ],
+      "id": "c8d7c3e1-7ff7-42cc-ba59-a70ce01711b1",
+      "name": "Telegram Trigger",
+      "webhookId": "50c4c642-0172-4ea9-a95f-99f74a752264",
+      "credentials": {
+        "telegramApi": {
+          "id": "nr6VlcCoccUPE02J",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "sendChatAction",
+        "chatId": "={{ $json.message.chat.id }}"
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -960,
+        544
+      ],
+      "id": "3e803492-f193-4214-a0c4-5991a88f669b",
+      "name": "Typing Start",
+      "webhookId": "d7067361-a35e-4cc5-ad5b-63906ecd60a0",
+      "credentials": {
+        "telegramApi": {
+          "id": "nr6VlcCoccUPE02J",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const message = $('Telegram Trigger').item.json.message;\n\nlet input_text = message.text || message.caption || \"\";\nlet message_type = \"text\";\nlet has_file = false;\nlet has_caption = false;\nlet file_id = null;\nlet file_name = null;\nlet mime_type = null;\n\nif (message.voice) {\n  message_type = \"voice\";\n  has_file = true;\n  file_id = message.voice.file_id;\n  mime_type = message.voice.mime_type || \"audio/ogg\";\n  file_name = `voice_${Date.now()}.ogg`;\n} else if (message.document) {\n  message_type = \"document\";\n  has_file = true;\n  file_id = message.document.file_id;\n  file_name = message.document.file_name || \"unknown_file\";\n  mime_type = message.document.mime_type || \"application/octet-stream\";\n} else if (message.photo) {\n  message_type = \"image\";\n  has_file = true;\n  const photos = message.photo;\n  file_id = photos[photos.length - 1].file_id;\n  mime_type = \"image/jpeg\";\n  file_name = `photo_${Date.now()}.jpg`;\n} else if (message.sticker) {\n  message_type = \"sticker\";\n} else if (message.video || message.animation || message.contact || message.location || message.video_note) {\n  message_type = \"unsupported\";\n}\n\n// Detect commands\nlet is_command = false;\nlet command = null;\nif (input_text && input_text.startsWith('/')) {\n  is_command = true;\n  command = input_text.split(' ')[0].split('@')[0].toLowerCase();\n}\n\nif (has_file && message_type !== \"voice\" && message.caption && message.caption.trim().length > 0) {\n  has_caption = true;\n}\n\nreturn {\n  json: {\n    input_text: input_text.trim(),\n    message_type,\n    has_file,\n    has_caption,\n    file_id,\n    file_name,\n    mime_type,\n    is_command,\n    command,\n    user_id: message.from.id,\n    user_name: message.chat.first_name || \"User\",\n    chat_id: message.chat.id,\n    timestamp: new Date().toISOString()\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -768,
+        544
+      ],
+      "id": "16ed4516-ba11-4f27-b628-7c0425dd78c1",
+      "name": "Input Preprocessor"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "cmd-check",
+              "leftValue": "={{ $json.is_command }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -560,
+        336
+      ],
+      "id": "18909247-afb6-42ce-8051-5d1f17a9b3b6",
+      "name": "Is Command?"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "cmd-start",
+                    "leftValue": "={{ $json.command }}",
+                    "rightValue": "/start",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "start"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "cmd-help",
+                    "leftValue": "={{ $json.command }}",
+                    "rightValue": "/help",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "help"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "cmd-clear",
+                    "leftValue": "={{ $json.command }}",
+                    "rightValue": "/clear",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "clear"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "cmd-voice",
+                    "leftValue": "={{ $json.command }}",
+                    "rightValue": "/voice",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "voice"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -320,
+        112
+      ],
+      "id": "f0e36df1-e613-428d-a3f4-f4767a6d176e",
+      "name": "Command Router"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chat_id }}",
+        "text": "hey! 👋 i'm Cleo, your personal AI assistant.\n\ni can help you with:\n📅 Google Calendar — schedule, view, manage events\n📧 Gmail — send, read, search emails\n📝 Google Docs — create docs, quick notes\n✅ Google Tasks — reminders & to-dos\n📊 Google Sheets — spreadsheets\n☁️ Google Drive — file management\n🎤 Voice messages — just talk to me!\n📄 Files — send PDFs, images, text files\n\ntype /help anytime to see commands.\nlet's get to it! 🚀",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -80,
+        -128
+      ],
+      "id": "71cd596f-77c1-4281-bd11-9aa7f9dfdeee",
+      "name": "Start Message",
+      "webhookId": "bf846da6-f0d9-4ff3-aa82-3f4345eee798",
+      "credentials": {
+        "telegramApi": {
+          "id": "nr6VlcCoccUPE02J",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chat_id }}",
+        "text": "here's what i can do ✨\n\n🗣️ just chat with me naturally — no special format needed\n\n📅 calendar — \"schedule a meeting tomorrow at 3pm\" / \"what's on my calendar today?\"\n📧 email — \"send an email to john@...\" / \"check my unread emails\"\n📝 notes — \"note: wifi password is ABC123\"\n✅ reminders — \"remind me to call John at 5pm\"\n📊 sheets — \"create a spreadsheet for expenses\"\n☁️ drive — send a file + say \"upload to drive\"\n🔍 wikipedia — \"look up quantum computing\"\n🎤 voice — send voice messages, i'll understand\n📄 files — send PDFs, images, text files\n\ncommands:\n/start — welcome message\n/help — this menu\n/clear — clear conversation history\n/voice — check voice message usage",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -80,
+        32
+      ],
+      "id": "e4c92620-4a1c-4146-aad0-cff49cf7f52a",
+      "name": "Help Message",
+      "webhookId": "3067aee7-f629-4ba9-92d6-6130cd8335fe",
+      "credentials": {
+        "telegramApi": {
+          "id": "nr6VlcCoccUPE02J",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "delete",
+        "collection": "Conversations",
+        "query": "={ \"user_id\": {{ $json.user_id }} }"
+      },
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.2,
+      "position": [
+        -80,
+        192
+      ],
+      "id": "b457e860-0996-4b48-b4d2-444d56e5ac8f",
+      "name": "Clear History",
+      "credentials": {
+        "mongoDb": {
+          "id": "MLdBOJwxchOTO5qK",
+          "name": "MongoDB account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $node['Input Preprocessor'].json.chat_id }}",
+        "text": "conversation history cleared ✓\n\nfresh start! what's up?",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        160,
+        192
+      ],
+      "id": "34b565da-5c06-415b-96f6-6ef5b4baa6f3",
+      "name": "Clear Confirm",
+      "webhookId": "c636f5f6-3aee-4bd1-b927-d63f5c31630a",
+      "credentials": {
+        "telegramApi": {
+          "id": "nr6VlcCoccUPE02J",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "collection": "voice_usage",
+        "options": {
+          "limit": 5,
+          "sort": "{ \"timestamp\": -1 }"
+        },
+        "query": "={ \"user_id\": {{ $json.user_id }}, \"date\": \"{{ $now.format('yyyy-MM-dd') }}\" }"
+      },
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.2,
+      "position": [
+        -80,
+        352
+      ],
+      "id": "4f77775e-cc1c-47e2-a771-789510c07c66",
+      "name": "Voice Usage Query",
+      "alwaysOutputData": true,
+      "credentials": {
+        "mongoDb": {
+          "id": "MLdBOJwxchOTO5qK",
+          "name": "MongoDB account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const allItems = $input.all();\n\nconst count = allItems.filter(i => i.json._id).length;\nconst remaining = Math.max(0, 5 - count);\nconst chatId = $node['Input Preprocessor'].json.chat_id;\n\nreturn [{\n  json: {\n    chat_id: chatId,\n    count,\n    remaining,\n    text: `🎤 voice messages today: ${count}/5\\n${\n      remaining > 0\n        ? `you have ${remaining} left!`\n        : 'limit reached — resets tomorrow!'\n    }`\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        160,
+        352
+      ],
+      "id": "7d9b7e8b-76c3-49a8-bea4-a523a8422c0a",
+      "name": "Voice Usage Count"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chat_id }}",
+        "text": "={{ $json.text }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        400,
+        352
+      ],
+      "id": "6d2892d4-ebc1-48cb-88ff-bdcaa1824f5c",
+      "name": "Voice Usage Msg",
+      "webhookId": "53b16874-4283-43ff-8c44-11a734752a8f",
+      "credentials": {
+        "telegramApi": {
+          "id": "nr6VlcCoccUPE02J",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chat_id }}",
+        "text": "hmm i don't know that command — try /help to see what i can do!",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -64,
+        496
+      ],
+      "id": "4f918a27-238e-4a2a-bf0d-7be40f240f6b",
+      "name": "Unknown Command",
+      "webhookId": "501bb4ef-c074-4795-87cf-d9d694800cf8",
+      "credentials": {
+        "telegramApi": {
+          "id": "nr6VlcCoccUPE02J",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "collection": "Conversations",
+        "options": {
+          "limit": 6,
+          "sort": "{ \"timestamp\": -1 }"
+        },
+        "query": "={ \"user_id\": {{ $json.user_id }} }"
+      },
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.2,
+      "position": [
+        -560,
+        544
+      ],
+      "id": "05da70af-8927-49b1-a0b1-cab2bc5d08af",
+      "name": "Rate Limit Query",
+      "alwaysOutputData": true,
+      "credentials": {
+        "mongoDb": {
+          "id": "MLdBOJwxchOTO5qK",
+          "name": "MongoDB account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const tenSecondsAgo = new Date(Date.now() - 10000);\nlet recentCount = 0;\nfor (const item of items) {\n  const ts = item.json.timestamp ? new Date(item.json.timestamp) : null;\n  if (ts && ts >= tenSecondsAgo) recentCount++;\n}\nconst preprocessor = $node[\"Input Preprocessor\"].json;\nreturn [{ json: { ...preprocessor, rate_limited: recentCount >= 5 } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -368,
+        544
+      ],
+      "id": "55b1f584-8988-4bb2-8112-a721a20468a9",
+      "name": "Rate Limit Count"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "rate-limit-check",
+              "leftValue": "={{ $json.rate_limited }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -192,
+        544
+      ],
+      "id": "a7333ce3-a82b-4537-85cc-ba5964de6c14",
+      "name": "Rate Limited?"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chat_id }}",
+        "text": "woah slow down 😅 give me a sec to catch up!",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        160,
+        512
+      ],
+      "id": "87820b6c-9199-492e-b06c-7afa74b9aeb8",
+      "name": "Rate Limited Msg",
+      "webhookId": "5bcdbce5-cec5-4df7-9041-dfd44488b639",
+      "credentials": {
+        "telegramApi": {
+          "id": "nr6VlcCoccUPE02J",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "98a0ea91",
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              },
+              "leftValue": "={{ $json.user_id }}",
+              "rightValue": 6582818644
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        48,
+        656
+      ],
+      "id": "e6986696-7919-41f6-a03c-c1133fb102e9",
+      "name": "Auth Check"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "You do not have an active subscription for this Bot. For details, Please Contact matrixworkflows@gmail.com",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        288,
+        832
+      ],
+      "id": "67dce5e9-47c2-4705-9369-132776baeb9c",
+      "name": "Reject Unauthorized",
+      "webhookId": "1250199c-38d6-4692-9c37-33ca858971e3",
+      "credentials": {
+        "telegramApi": {
+          "id": "nr6VlcCoccUPE02J",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "sticker-check",
+              "leftValue": "={{ $json.message_type }}",
+              "rightValue": "sticker",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        288,
+        656
+      ],
+      "id": "fa42f352-be17-478a-bb12-a40bcca55d68",
+      "name": "Is Sticker?"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const responses = [\n  \"haha nice sticker 😄\",\n  \"love that one 😂\",\n  \"ooo good choice 🔥\",\n  \"that's a vibe 💀\",\n  \"lmaooo 😭\",\n  \"sticker game strong 💪\",\n  \"i feel that 😌\",\n  \"mood tbh 😎\",\n  \"okay okay i see you 👀\",\n  \"big energy right there ⚡\"\n];\nconst pick = responses[Math.floor(Math.random() * responses.length)];\nreturn { json: { chat_id: $json.chat_id, response: pick } };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        528,
+        576
+      ],
+      "id": "88795788-747b-42c8-8f20-67c83b2c4213",
+      "name": "Pick Sticker Reply"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chat_id }}",
+        "text": "={{ $json.response }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        768,
+        528
+      ],
+      "id": "cb77127a-6b89-4dcc-9cdb-bca833d761ea",
+      "name": "Send Sticker Reply",
+      "webhookId": "db997e6f-7bc4-40f5-aafc-99b17808d476",
+      "credentials": {
+        "telegramApi": {
+          "id": "nr6VlcCoccUPE02J",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "unsup-check",
+              "leftValue": "={{ $json.message_type }}",
+              "rightValue": "unsupported",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        528,
+        768
+      ],
+      "id": "82a60100-36f0-4988-926b-642cf1527207",
+      "name": "Unsupported Type?"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chat_id }}",
+        "text": "hmm i can't process that type of message yet — try sending text, voice, images, or documents!",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        768,
+        688
+      ],
+      "id": "d7a98a24-c393-419e-a05d-fb52af019f39",
+      "name": "Unsupported Message",
+      "webhookId": "fb84ff51-f86d-4942-9774-00ffe488a7e6",
+      "credentials": {
+        "telegramApi": {
+          "id": "nr6VlcCoccUPE02J",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "voice-check",
+              "leftValue": "={{ $json.message_type }}",
+              "rightValue": "voice",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        768,
+        864
+      ],
+      "id": "50d89131-ca4b-4715-a142-ae0efe58a62b",
+      "name": "Is Voice?"
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "fileId": "={{ $json.file_id }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1008,
+        784
+      ],
+      "id": "48a44521-6a5e-45e3-b94e-4fe3b9acfc11",
+      "name": "Download Voice",
+      "webhookId": "7b361dd9-9e1c-4e57-85fb-574ac5836f95",
+      "credentials": {
+        "telegramApi": {
+          "id": "nr6VlcCoccUPE02J",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "audio",
+        "operation": "transcribe",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.1,
+      "position": [
+        1248,
+        784
+      ],
+      "id": "21417d17-af14-4cfe-99e8-5d0f9da08571",
+      "name": "Whisper STT",
+      "credentials": {
+        "openAiApi": {
+          "id": "EbPfZvscveKnxoX8",
+          "name": "OpenAi account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const original = $node[\"Input Preprocessor\"].json;\nconst transcript = $json.text || \"\";\nif (transcript.trim().length < 2) {\n  return { json: { ...original, input_text: \"\", voice_failed: true } };\n}\nreturn {\n  json: {\n    ...original,\n    input_text: transcript.trim(),\n    message_type: \"text\",\n    has_file: false,\n    has_caption: false,\n    file_id: null,\n    file_name: null,\n    mime_type: null,\n    voice_transcribed: true\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1488,
+        784
+      ],
+      "id": "beeb82b1-54d2-427f-beb9-ae4ead07c239",
+      "name": "Voice to Text"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "vf-check",
+              "leftValue": "={{ $json.voice_failed }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1728,
+        784
+      ],
+      "id": "9808712d-6fb5-4bc2-9730-f511bcc8fe39",
+      "name": "Voice OK?"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chat_id }}",
+        "text": "couldn't catch that 😅 could you try again or maybe type it out?",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1968,
+        704
+      ],
+      "id": "92a320d6-7749-4c07-af8e-b19c1eefd08a",
+      "name": "Voice Failed Msg",
+      "webhookId": "fd2955ce-21e6-4716-9d36-ec1a2123ceaa",
+      "credentials": {
+        "telegramApi": {
+          "id": "nr6VlcCoccUPE02J",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "file-check",
+              "leftValue": "={{ $json.has_file }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1008,
+        1024
+      ],
+      "id": "4bbce7c9-2746-45e1-889a-4028f877867a",
+      "name": "Has File?"
+    },
+    {
+      "parameters": {
+        "operation": "sendChatAction",
+        "chatId": "={{ $json.chat_id }}"
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1248,
+        944
+      ],
+      "id": "324bb273-3734-4fd4-b0a1-bdf8451b2e80",
+      "name": "Typing File",
+      "webhookId": "46a8982a-a420-41cc-b2d5-bdf3af760bc5",
+      "credentials": {
+        "telegramApi": {
+          "id": "nr6VlcCoccUPE02J",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "fileId": "={{ $node['Input Preprocessor'].json.file_id }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1488,
+        944
+      ],
+      "id": "b428cea2-0ca8-4c37-8d5c-3b0b51277b52",
+      "name": "Download File",
+      "webhookId": "949c2bbe-c355-421e-ba35-41f508a8342e",
+      "credentials": {
+        "telegramApi": {
+          "id": "nr6VlcCoccUPE02J",
+          "name": "Telegram account 3"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $node['Input Preprocessor'].json.chat_id }}",
+        "text": "hmm couldn't download that file — it might be too large (max 20MB). try a smaller file or share via a link?",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1600,
+        1072
+      ],
+      "id": "e73e3325-c92d-4bcc-b5c6-2fb54fe2143a",
+      "name": "File Download Error",
+      "webhookId": "c0766466-48fe-4776-ba95-c7c56c4f1662",
+      "credentials": {
+        "telegramApi": {
+          "id": "nr6VlcCoccUPE02J",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "sw-doc",
+                    "leftValue": "={{ $node['Input Preprocessor'].json.message_type }}",
+                    "rightValue": "document",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Document"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "sw-img",
+                    "leftValue": "={{ $node['Input Preprocessor'].json.message_type }}",
+                    "rightValue": "image",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Image"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        1728,
+        944
+      ],
+      "id": "1bf23981-5e95-4208-bdeb-205161ad7945",
+      "name": "File Type Switch"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "mime-pdf",
+                    "leftValue": "={{ $node['Input Preprocessor'].json.mime_type }}",
+                    "rightValue": "pdf",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "PDF"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "mime-txt",
+                    "leftValue": "={{ $node['Input Preprocessor'].json.mime_type }}",
+                    "rightValue": "text/",
+                    "operator": {
+                      "type": "string",
+                      "operation": "startsWith"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "TXT"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        1968,
+        864
+      ],
+      "id": "a19c162e-64bc-4fb7-a7fc-5da73a8116e0",
+      "name": "Doc Type Switch"
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        2208,
+        784
+      ],
+      "id": "4c74ba03-d959-4e8b-8075-240e77020bb1",
+      "name": "PDF Extractor"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const original = $node[\"Input Preprocessor\"].json;\nconst data = $input.item.json || {};\nconst extractedText = data.text || \"\";\nconst pageCount = data.numpages || 0;\nconst metadata = data.info || {};\nlet extraction_note = null;\nif (!extractedText || extractedText.trim().length < 10) {\n  extraction_note = \"[This PDF appears to be scanned/image-based. Text extraction returned minimal content.]\";\n}\nreturn { json: { ...original, mode: \"file\", file_type: \"pdf\", page_count: pageCount, doc_title: metadata.Title || null, doc_author: metadata.Author || null, extracted_text: extraction_note || extractedText, extraction_failed: !!extraction_note } };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2448,
+        784
+      ],
+      "id": "86734d20-5239-46de-9022-36a1b8f377c5",
+      "name": "PDF Metadata"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const original = $node[\"Input Preprocessor\"].json;\nlet content = \"\";\ntry { const binaryData = $binary.data.data; const buffer = Buffer.from(binaryData, 'base64'); content = buffer.toString('utf8'); } catch (e) { content = \"[Failed to read text file]\"; }\nreturn { json: { ...original, mode: \"file\", file_type: \"text\", extracted_text: content } };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2448,
+        944
+      ],
+      "id": "c748921d-2e0e-4f83-9b8e-0fae5a1c92ea",
+      "name": "TXT Metadata"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $node['Input Preprocessor'].json.chat_id }}",
+        "text": "sorry, i can't process that file type yet! i support PDFs, text files, and images for now.",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2448,
+        1120
+      ],
+      "id": "e95cd9fb-9821-4667-980f-e43a0e670187",
+      "name": "Unsupported File Msg",
+      "webhookId": "30dbf37d-c39a-4831-ad07-94845b6ee718",
+      "credentials": {
+        "telegramApi": {
+          "id": "nr6VlcCoccUPE02J",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const original = $node[\"Input Preprocessor\"].json;\nreturn { json: { ...original, mode: \"file\", file_type: \"image\", extracted_text: null } };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1968,
+        1088
+      ],
+      "id": "9704eeda-fd59-4512-9f2e-c35e414ffb00",
+      "name": "IMG Metadata"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "caption-check",
+              "leftValue": "={{ $json.has_caption }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2688,
+        944
+      ],
+      "id": "94e146a3-5968-4dac-b830-1bcc6886d434",
+      "name": "Has Caption?"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const d = $json;\nconst instruction = d.input_text || \"\";\nlet contentBlock = \"\";\nif (d.file_type === \"pdf\" || d.file_type === \"text\") { contentBlock = d.extracted_text || \"[No content extracted]\"; } else if (d.file_type === \"image\") { contentBlock = \"[Image file — no text content. Use ImageAI to describe if needed.]\"; }\nconst combined = `[User sent a file: ${d.file_name || 'unknown'} (${d.file_type})]\\nUser says: \"${instruction}\"\\n\\n--- File Content ---\\n${contentBlock.substring(0, 8000)}\\n---`;\nreturn { json: { ...d, mode: \"file\", combined_prompt: combined } };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2928,
+        864
+      ],
+      "id": "ef4214d3-43df-4d9f-84a6-5311fe61e8d7",
+      "name": "Build File Context"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const d = $json;\nreturn { json: { user_id: d.user_id, chat_id: d.chat_id, file_id: d.file_id, file_name: d.file_name, file_type: d.file_type || d.message_type, mime_type: d.mime_type, extracted_text: (d.extracted_text || \"\").substring(0, 15000), status: \"pending\", timestamp: new Date().toISOString() } };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2928,
+        1056
+      ],
+      "id": "ecfe6bd4-d357-4230-b937-2a2b2934d609",
+      "name": "Prepare Pending"
+    },
+    {
+      "parameters": {
+        "operation": "delete",
+        "collection": "pending_files",
+        "query": "={ \"user_id\": {{ $json.user_id }} }"
+      },
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.2,
+      "position": [
+        3168,
+        1056
+      ],
+      "id": "abe2d682-c922-4feb-9e03-e4b7c4a9eae0",
+      "name": "Delete Old Pending",
+      "credentials": {
+        "mongoDb": {
+          "id": "MLdBOJwxchOTO5qK",
+          "name": "MongoDB account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "collection": "pending_files",
+        "fields": "user_id,chat_id,file_id,file_name,file_type,mime_type,extracted_text,status,timestamp",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.2,
+      "position": [
+        3408,
+        1056
+      ],
+      "id": "3a35acb2-d362-4e3e-aebd-a95a9a056373",
+      "name": "Save Pending File",
+      "credentials": {
+        "mongoDb": {
+          "id": "MLdBOJwxchOTO5qK",
+          "name": "MongoDB account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $node['Input Preprocessor'].json.chat_id }}",
+        "text": "got the file! 📄 what would you like me to do with it?",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        3648,
+        1056
+      ],
+      "id": "3710d4c6-8349-4cc8-abdf-89241fc8761f",
+      "name": "Ask What To Do",
+      "webhookId": "31d0e9c6-afbf-4036-a7c6-93615fc975c5",
+      "credentials": {
+        "telegramApi": {
+          "id": "nr6VlcCoccUPE02J",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "collection": "pending_files",
+        "options": {
+          "limit": 1,
+          "sort": "{ \"timestamp\": -1 }"
+        },
+        "query": "={ \"user_id\": {{ $json.user_id }}, \"status\": \"pending\" }"
+      },
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.2,
+      "position": [
+        1248,
+        1216
+      ],
+      "id": "3ac0e4b8-22ec-4ba0-ab5e-eb520365827b",
+      "name": "Check Pending File",
+      "alwaysOutputData": true,
+      "credentials": {
+        "mongoDb": {
+          "id": "MLdBOJwxchOTO5qK",
+          "name": "MongoDB account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const pending = $json || {};\nlet currentInput = $node[\"Input Preprocessor\"].json;\nlet inputText = currentInput.input_text;\ntry { const voiceData = $node[\"Voice to Text\"].json; if (voiceData && voiceData.input_text && voiceData.voice_transcribed) { inputText = voiceData.input_text; } } catch(e) {}\nconst hasPending = pending.status === \"pending\" && pending.file_id;\nif (!hasPending) { return { json: { mode: \"text\", input_text: inputText, combined_prompt: null, file_id: null, file_name: null, file_type: null, mime_type: null, extracted_text: null, user_id: currentInput.user_id, chat_id: currentInput.chat_id, pending_id: null, has_file: false, has_caption: false, message_type: \"text\" } }; }\nconst thirtyMinAgo = new Date(Date.now() - 30 * 60 * 1000);\nconst pendingTime = pending.timestamp ? new Date(pending.timestamp) : null;\nconst isExpired = !pendingTime || pendingTime < thirtyMinAgo;\nif (isExpired) { return { json: { mode: \"text\", input_text: inputText, combined_prompt: null, file_id: null, file_name: null, file_type: null, mime_type: null, extracted_text: null, user_id: currentInput.user_id, chat_id: currentInput.chat_id, pending_id: pending._id || null, expired_pending: true, has_file: false, has_caption: false, message_type: \"text\" } }; }\nconst contentBlock = (pending.extracted_text || \"[No content extracted]\").substring(0, 8000);\nreturn { json: { mode: \"file_followup\", input_text: inputText, combined_prompt: `[User has a pending file: ${pending.file_name} (${pending.mime_type})]\\nUser now says: \"${inputText}\"\\n\\n--- Pending File Content ---\\n${contentBlock}\\n---`, file_id: pending.file_id, file_name: pending.file_name, file_type: pending.file_type, mime_type: pending.mime_type, extracted_text: pending.extracted_text, user_id: currentInput.user_id, chat_id: currentInput.chat_id, pending_id: pending._id, has_file: true, has_caption: true, message_type: currentInput.message_type || \"text\" } };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1488,
+        1216
+      ],
+      "id": "9ffaf1bf-3a5f-43c0-9720-ebc545826733",
+      "name": "Process Pending"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "followup-check",
+              "leftValue": "={{ $json.mode }}",
+              "rightValue": "file_followup",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1728,
+        1216
+      ],
+      "id": "f9ba1f1b-c954-438b-bcab-0f7c1fc9ad8d",
+      "name": "Is Followup?"
+    },
+    {
+      "parameters": {
+        "operation": "delete",
+        "collection": "pending_files",
+        "query": "={ \"user_id\": {{ $json.user_id }}, \"status\": \"pending\" }"
+      },
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.2,
+      "position": [
+        1968,
+        1216
+      ],
+      "id": "bee212b5-0394-435f-a845-a10b29983a5c",
+      "name": "Delete Processed Pending",
+      "credentials": {
+        "mongoDb": {
+          "id": "MLdBOJwxchOTO5qK",
+          "name": "MongoDB account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "sendChatAction",
+        "chatId": "={{ $node['Input Preprocessor'].json.chat_id }}"
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2928,
+        336
+      ],
+      "id": "9dff5a47-adad-4114-8d73-c6738e812668",
+      "name": "Typing Pre-History",
+      "webhookId": "c2bda52e-4ed9-48e9-9c9b-da409caee1d7",
+      "credentials": {
+        "telegramApi": {
+          "id": "nr6VlcCoccUPE02J",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "collection": "Conversations",
+        "options": {
+          "limit": 10,
+          "sort": "{ \"timestamp\": -1 }"
+        },
+        "query": "={ \"user_id\": {{ $node['Input Preprocessor'].json.user_id }} }"
+      },
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.2,
+      "position": [
+        3168,
+        336
+      ],
+      "id": "fadda580-9ae7-4d3b-b83d-cf87622c90ce",
+      "name": "Load Chat History",
+      "alwaysOutputData": true,
+      "credentials": {
+        "mongoDb": {
+          "id": "MLdBOJwxchOTO5qK",
+          "name": "MongoDB account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const history = [...items].reverse();\nconst formatted = [];\nfor (const item of history) {\n  if (item.json.user_input) formatted.push({ role: \"user\", content: item.json.user_input });\n  if (item.json.agent_output) formatted.push({ role: \"assistant\", content: item.json.agent_output });\n}\nreturn [{ json: { conversation_history: formatted } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3408,
+        336
+      ],
+      "id": "17dac3a4-1120-4c40-bd2d-a3f61d7237ff",
+      "name": "Format Chat History"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "documentURL": "1Z-H-5ocNfqFM-wOZugKpu47UfFH_J9YBEtHROZH7qJA"
+      },
+      "type": "n8n-nodes-base.googleDocs",
+      "typeVersion": 2,
+      "position": [
+        3648,
+        336
+      ],
+      "id": "b6474a30-cf96-4b80-aadd-b836db22f83f",
+      "name": "Fetch Memory Doc",
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleDocsOAuth2Api": {
+          "id": "kwnm16xCdn9EtJPH",
+          "name": "Google Docs account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "let history = [];\ntry { history = $node[\"Format Chat History\"].json.conversation_history || []; } catch(e) {}\n\nlet memorySnippet = \"No memory stored yet.\";\ntry {\n  const docContent = $json.body?.content;\n  if (docContent && Array.isArray(docContent)) {\n    const fullText = docContent.map(block => {\n      if (block.paragraph && block.paragraph.elements) {\n        return block.paragraph.elements.map(el => el.textRun?.content || \"\").join(\"\");\n      }\n      return \"\";\n    }).join(\"\").trim();\n    if (fullText.length > 5) memorySnippet = fullText.substring(0, 2000);\n  }\n} catch(e) { memorySnippet = \"Memory unavailable.\"; }\n\nlet currentSource = null;\ntry { currentSource = $node[\"Build File Context\"].json; } catch(e) {}\nif (!currentSource) { try { currentSource = $node[\"Process Pending\"].json; } catch(e) {} }\nif (!currentSource) { try { const v = $node[\"Voice to Text\"].json; if (v && v.voice_transcribed) currentSource = v; } catch(e) {} }\nif (!currentSource) currentSource = $node[\"Input Preprocessor\"].json;\n\nlet currentMessage = currentSource.combined_prompt || currentSource.input_text || \"\";\n\nconst historyText = history.length > 0 ? history.map(m => `${m.role}: ${m.content}`).join('\\n\\n') : 'No previous conversation.';\n\nreturn { json: { current_message: currentMessage, history_text: historyText, memory_snippet: memorySnippet, user_id: currentSource.user_id || $node[\"Input Preprocessor\"].json.user_id, chat_id: currentSource.chat_id || $node[\"Input Preprocessor\"].json.chat_id, file_id: currentSource.file_id || null, file_name: currentSource.file_name || null, mime_type: currentSource.mime_type || null, mode: currentSource.mode || \"text\" } };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3888,
+        336
+      ],
+      "id": "106eb57c-06e5-41b3-b75f-d7a48bac6571",
+      "name": "Build Orchestrator Input"
+    },
+    {
+      "parameters": {
+        "operation": "sendChatAction",
+        "chatId": "={{ $json.chat_id }}"
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        4128,
+        336
+      ],
+      "id": "9b94e626-971d-4386-aea9-ee05d719df48",
+      "name": "Typing Pre-AI",
+      "webhookId": "ac607bea-84bb-4b31-ba6c-2cd8b158afb7",
+      "credentials": {
+        "telegramApi": {
+          "id": "nr6VlcCoccUPE02J",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "sendChatAction",
+        "chatId": "={{ $('Build Orchestrator Input').item.json.chat_id }}"
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        4128,
+        112
+      ],
+      "id": "cf014765-2b3b-4797-83ae-15b836c13b2b",
+      "name": "Typing Refresh 1",
+      "webhookId": "577f3d8c-5114-41ca-a566-79b9ae8ee83b",
+      "credentials": {
+        "telegramApi": {
+          "id": "nr6VlcCoccUPE02J",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 4
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        4368,
+        112
+      ],
+      "id": "365f527b-fadb-4d80-bc05-1a4992fc2191",
+      "name": "Wait 4s",
+      "webhookId": "a1b2c3d4-wait-4s-webhook"
+    },
+    {
+      "parameters": {
+        "operation": "sendChatAction",
+        "chatId": "={{ $('Build Orchestrator Input').item.json.chat_id }}"
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        4608,
+        112
+      ],
+      "id": "ef72c20e-5c09-49d2-9809-aedf688881e7",
+      "name": "Typing Refresh 2",
+      "webhookId": "4b0dfe16-61bb-4a29-be88-3168b1173b18",
+      "credentials": {
+        "telegramApi": {
+          "id": "nr6VlcCoccUPE02J",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 4
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        4848,
+        112
+      ],
+      "id": "4b592069-a61a-4675-a1fa-ee43beb8689b",
+      "name": "Wait 4s Again",
+      "webhookId": "a1b2c3d4-wait-4s2-webhook"
+    },
+    {
+      "parameters": {
+        "operation": "sendChatAction",
+        "chatId": "={{ $('Build Orchestrator Input').item.json.chat_id }}"
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        5088,
+        112
+      ],
+      "id": "5856fa00-a2e8-4c65-b07a-8690b83b9655",
+      "name": "Typing Refresh 3",
+      "webhookId": "e11acd5b-898a-4e57-8d7b-d2c2cfc68876",
+      "credentials": {
+        "telegramApi": {
+          "id": "nr6VlcCoccUPE02J",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $('Build Orchestrator Input').item.json.current_message }}",
+        "options": {
+          "systemMessage": "=You are Cleo, a highly capable personal AI assistant.\n\nCurrent date and time: {{ $now.setZone('Asia/Kolkata').format('yyyy-MM-dd HH:mm:ss') }} IST\nToday: {{ $now.setZone('Asia/Kolkata').format('EEEE, MMMM dd, yyyy') }}\nTimezone: Asia/Kolkata (IST, UTC+05:30)\n\n=== PERSONALITY ===\nConfident Gen-Z female tone. Casual, sharp, direct. Slightly playful. Uses light modern slang naturally but not excessively. Smart energy, not hype.\n\nBE BRIEF. No scripts. No over-explaining. Get to the point.\n\nTone examples:\n\"okay lemme check\"\n\"nah that's wrong\"\n\"booked ✓\"\n\"need more details — which day?\"\n\"done\"\n\"noted ✓\"\n\"reminder set ✓\"\n\nCRITICAL: Never alter factual data, dates, times, links, email content, extracted text, spreadsheet data, or tool results. Only style conversational parts.\n\n=== YOUR MEMORY ===\nYou know personal things about the user. Use naturally — don't say \"according to my records.\" Just know it.\n\n{{ $('Build Orchestrator Input').item.json.memory_snippet }}\n\nFor detailed recall, use Memory_Recall tool.\n\n=== TOOLS ===\nGoogle_Calendar → events, meetings, schedules, availability\nGoogle_Docs → create/read/edit documents, quick notes\nGoogle_Tasks → to-do lists, reminders with specific times\nGoogle_Sheets → spreadsheets and tracking\nGoogle_Drive → files and folders\nGmail → emails and drafts\nWikipedia → factual information lookup\nMemory_Recall → search user's personal memory\n\n=== MULTI-STEP TASKS ===\nYou can call up to 3 tools per turn when needed.\nExecute sequentially. Give one unified response after.\nMax 3 tool calls per turn. If more needed, complete first 3 and tell user.\n\n=== CRITICAL: HOW TO CALL TOOLS ===\n\nBefore calling ANY tool, follow these steps:\n\nSTEP 1 — RESOLVE CONTEXT:\nLook at the conversation history. If the user says \"it\", \"that\", \"this\", \"the one\", \"same one\", \"him\", \"her\", etc., figure out WHAT they mean from the previous messages.\n- User discussed \"Meeting with Bob\" then says \"delete it\" → \"it\" = \"Meeting with Bob\". Call Calendar.\n- User just saw calendar results showing \"Meeting 3-4 AM\" then says \"delete it\" → \"it\" = \"Meeting\". Call Calendar.\n- User was talking about a doc then says \"share it\" → \"it\" = that doc. Call Drive.\n- User mentioned \"Dr. Ritesh\" earlier then says \"book with him\" → \"him\" = Dr. Ritesh. Call Calendar.\nNEVER ask \"which it?\" or \"what do you mean?\" if the context is obvious from the last 2-3 messages.\nIf the user was JUST talking about a calendar event, \"it\" means that calendar event. Period.\nIf the user was JUST talking about a document, \"it\" means that document. Period.\nIf the user was JUST talking about a task, \"it\" means that task. Period.\nYou have conversation history — USE IT.\n\nSTEP 2 — CHECK COMPLETENESS:\nFor CREATING calendar events: must have title + date + time. If missing, ask user.\nFor CREATING reminders: must have what to remind + when. If missing, ask.\nFor EVERYTHING ELSE (delete, update, rename, lookup, send, share, etc.): you almost always have enough context from the conversation. Just act.\n\nSTEP 3 — BUILD COMPLETE INSTRUCTION:\nConstruct a full, self-contained sentence with ALL resolved details.\nWRONG: \"delete it\" → RIGHT: \"Delete the calendar event titled 'Meeting' scheduled today 3:00-4:00 AM\"\nWRONG: \"rename it to Standup\" → RIGHT: \"Rename the calendar event 'Team Meeting' tomorrow 3 PM to 'Standup'\"\nWRONG: \"yeah send it\" → RIGHT: \"Send email to john@example.com subject 'Update' body '...'\"\nWRONG: \"mark it done\" → RIGHT: \"Mark the task 'Buy groceries' as complete\"\nWRONG: \"retry\" → RIGHT: rebuild the FULL original request\n\nSTEP 4 — CALL THE TOOL. Do not ask for confirmation.\n\n=== CALENDAR-SPECIFIC RULES ===\nFor CREATING events: you MUST have title + date + time. If any missing, ask.\n  - \"Schedule a meeting\" → ask: \"when should i book it?\"\n  - \"Meeting tomorrow\" → ask: \"what time?\"\n  - \"Call at 3pm\" → assume today, call tool\n  - \"Team standup tomorrow at 10am\" → call tool immediately\n\nFor DELETE/UPDATE/RENAME: resolve the event name and date from conversation context, then call the tool immediately. Do NOT ask the user to re-specify details you already know.\n\nFor LOOKUPS: specify the date range clearly.\n\n=== QUICK NOTES ===\nWhen user says \"note\", \"note this\", \"save this\", \"jot down\", \"remember this\" followed by content:\n→ Call Google_Docs with: \"Note: [the content]\"\nThis appends to the user's personal notes doc with a timestamp.\nExamples:\n  - \"note: wifi password is ABC123\" → call Docs with \"Note: wifi password is ABC123\"\n  - \"save this: John's birthday is March 15\" → call Docs with \"Note: John's birthday is March 15\"\n\n=== REMINDERS ===\nWhen user says \"remind me\", \"set a reminder\", \"don't let me forget\":\n→ Call Google_Tasks with the full reminder details\nInclude WHAT to remind and WHEN (date + time if specified).\nExamples:\n  - \"remind me to call John tomorrow at 5pm\" → call Tasks with \"Create reminder: Call John tomorrow at 5pm\"\n  - \"remind me to buy groceries\" (no time) → call Tasks with \"Create task: Buy groceries\" (no reminder time)\nThe reminder system will automatically send a Telegram notification at the specified time.\n\n=== FILE HANDLING ===\nWhen user sends file with instruction:\n- Summarize → summarize from content\n- Upload → call Google_Drive\n- Extract → present cleanly\n- Email/Send to someone → first upload to Google_Drive, get the shareable link, then call Gmail with the link in the email body. Tell user: \"sent with a Drive link ✓\"\n- Unclear → ask what they want\n\nFile metadata: file_id={{ $('Build Orchestrator Input').item.json.file_id || 'none' }}, file_name={{ $('Build Orchestrator Input').item.json.file_name || 'none' }}, mime_type={{ $('Build Orchestrator Input').item.json.mime_type || 'none' }}\n\n=== TOOL ROUTING ===\nRequest involves external data/actions → call tool (after checking you have enough info).\nCasual conversation → respond directly.\n\n=== VOICE RESPONSE ===\nYou can send voice messages too. only send message when asked explicitly.\nTry to keep voice notes concise.\nOnly add [VOICE] tag at end if user explicitly requests voice response.\nNEVER add [VOICE] for tool results, data, links, calendar info, or work content.\n\n=== RESPONSE RULES ===\n- Be concise. No fluff.\n- Confirm actions clearly but briefly\n- If fails, explain simply in one line\n- Never expose tool names, JSON, or system internals\n- Never fabricate information\n- Don't over-explain. User asked, you deliver.\n\n=== CONVERSATION HISTORY ===\n{{ $('Build Orchestrator Input').item.json.history_text }}\n=== END HISTORY ==="
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        4368,
+        336
+      ],
+      "id": "72874354-bbe3-4f93-a9fc-289164aa8c20",
+      "name": "Orchestrator",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-5-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-5-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        4064,
+        704
+      ],
+      "id": "91d61531-7806-4256-9df6-ea35f68422a1",
+      "name": "GPT 5-mini Orchestrator",
+      "credentials": {
+        "openAiApi": {
+          "id": "EbPfZvscveKnxoX8",
+          "name": "OpenAi account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "description": "Call this tool to use Google Sheets",
+        "workflowId": {
+          "__rl": true,
+          "value": "CS9gu4QNAlDLbzA8",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        4544,
+        704
+      ],
+      "id": "e4727ecb-f7b6-45a4-b21f-4a4c39051fe0",
+      "name": "Google_Sheets"
+    },
+    {
+      "parameters": {
+        "description": "Manage Google Calendar (create/update/delete/view events). CRITICAL: Build a COMPLETE, SELF-CONTAINED instruction as Text. Always resolve pronouns — write 'Team Meeting' not 'it', write 'Dr. Ritesh' not 'him'. For creating: include the event title, date, and time. For updating/deleting: include the event name and any known dates. For lookups: specify which date or range. Example good Text: 'Create event titled Team Standup on 2025-06-27 at 10:00 AM for 1 hour'. Example bad Text: 'schedule a meeting' or 'rename it'.",
+        "workflowId": {
+          "__rl": true,
+          "value": "S0sGJb48jRQeUUrQ",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Text": "={{ $fromAI('Text', '', 'string') }}",
+            "Session ID": "={{ $('Telegram Trigger').item.json.message.chat.id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Text",
+              "displayName": "Text",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "Session ID",
+              "displayName": "Session ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        4784,
+        704
+      ],
+      "id": "c9889a33-49f0-48c1-b15f-ccba0ddcbb4b",
+      "name": "Google_Calendar"
+    },
+    {
+      "parameters": {
+        "description": "Use this tool to search Wikipedia. Required: Text (string) — the topic.",
+        "workflowId": {
+          "__rl": true,
+          "value": "DAFJdNVB6pXjzcht",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Text": "={{ $fromAI('Text', '', 'string') }}",
+            "Session ID": "={{ $('Telegram Trigger').item.json.message.chat.id }}"
+          },
+          "matchingColumns": [
+            "Text"
+          ],
+          "schema": [
+            {
+              "id": "Text",
+              "displayName": "Text",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Session ID",
+              "displayName": "Session ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        4896,
+        704
+      ],
+      "id": "779d85f4-b9fd-42ce-9ac6-4903d6e17d19",
+      "name": "Wikipedia"
+    },
+    {
+      "parameters": {
+        "description": "Search the user's personal memory for specific details. Use when user says 'do you remember', 'recall', 'what's my password', or asks about personal facts. Required: query (string) — what to search for.",
+        "workflowId": {
+          "__rl": true,
+          "value": "j9WMjh3Z96LnYD2l",
+          "mode": "id",
+          "cachedResultUrl": "/workflow/j9WMjh3Z96LnYD2l"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        5024,
+        704
+      ],
+      "id": "cf6dc0a3-693e-4364-b58a-50212c603085",
+      "name": "Memory_Recall"
+    },
+    {
+      "parameters": {
+        "jsCode": "const allItems = items;\nreturn [allItems[allItems.length - 1]];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4688,
+        336
+      ],
+      "id": "ed2733b6-55ed-407f-9e93-c6c483a59f18",
+      "name": "Take Last Item"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const output = $json.output || \"\";\nconst preprocessor = $node[\"Input Preprocessor\"].json;\nconst hasVoiceTag = output.includes(\"[VOICE]\");\nconst cleanOutput = output.replace(/\\[VOICE\\]/g, \"\").trim();\nreturn { json: { ...$json, output: cleanOutput, should_voice: hasVoiceTag, chat_id: preprocessor.chat_id, user_id: preprocessor.user_id } };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4928,
+        336
+      ],
+      "id": "6ba9b43a-c7ee-435d-98a2-65cc062b6dd3",
+      "name": "Voice Check"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "should-voice",
+              "leftValue": "={{ $json.should_voice }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        5168,
+        336
+      ],
+      "id": "fda87154-0fe0-4a46-8dcb-268bd1b55bde",
+      "name": "Should Voice?"
+    },
+    {
+      "parameters": {
+        "collection": "voice_usage",
+        "options": {
+          "limit": 5,
+          "sort": "{ \"timestamp\": -1 }"
+        },
+        "query": "={ \"user_id\": {{ $json.user_id }}, \"date\": \"{{ $now.format('yyyy-MM-dd') }}\" }"
+      },
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.2,
+      "position": [
+        5408,
+        176
+      ],
+      "id": "61fb20f7-55b8-46ed-a993-d9e7a7240173",
+      "name": "Voice Limit Check",
+      "alwaysOutputData": true,
+      "credentials": {
+        "mongoDb": {
+          "id": "MLdBOJwxchOTO5qK",
+          "name": "MongoDB account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const voiceCheck = $node[\"Voice Check\"].json;\nconst count = items.filter(i => i.json._id).length;\nreturn [{ json: { ...voiceCheck, voice_allowed: count < 5, voice_count: count } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5648,
+        176
+      ],
+      "id": "1f1d004b-921a-4a1e-b315-c0e76104b253",
+      "name": "Voice Limit OK?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "voice-allowed",
+              "leftValue": "={{ $json.voice_allowed }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        5888,
+        176
+      ],
+      "id": "814461a9-d52d-4260-a152-e7a4c1ba97f6",
+      "name": "IF Voice Allowed"
+    },
+    {
+      "parameters": {
+        "resource": "audio",
+        "input": "={{ $json.output }}",
+        "voice": "nova",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.1,
+      "position": [
+        6128,
+        96
+      ],
+      "id": "8082d7a9-d4c2-48e0-8938-55363f905e45",
+      "name": "Generate Audio",
+      "credentials": {
+        "openAiApi": {
+          "id": "EbPfZvscveKnxoX8",
+          "name": "OpenAi account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "collection": "voice_usage",
+        "fields": "user_id,date,timestamp",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.2,
+      "position": [
+        6128,
+        256
+      ],
+      "id": "5fa04ad6-878a-479b-8f7b-65cb40d67925",
+      "name": "Log Voice Usage",
+      "credentials": {
+        "mongoDb": {
+          "id": "MLdBOJwxchOTO5qK",
+          "name": "MongoDB account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const voiceCheck = $node[\"Voice Check\"].json;\nreturn { json: { user_id: voiceCheck.user_id, date: new Date().toISOString().split('T')[0], timestamp: new Date().toISOString() } };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6128,
+        416
+      ],
+      "id": "d4228ea6-0227-4a2f-af69-c2c199fa8f02",
+      "name": "Prep Voice Log"
+    },
+    {
+      "parameters": {
+        "operation": "sendDocument",
+        "chatId": "={{ $node['Voice Check'].json.chat_id }}",
+        "binaryData": true,
+        "additionalFields": {
+          "caption": "={{ $node['Voice Check'].json.output }}"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        6368,
+        96
+      ],
+      "id": "503a6bee-8ede-4116-8e9b-f2272afa1988",
+      "name": "Send Voice Response",
+      "webhookId": "1b58467d-c443-46e7-bab1-1bfd7f0c54bc",
+      "credentials": {
+        "telegramApi": {
+          "id": "nr6VlcCoccUPE02J",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const preprocessor = $node[\"Input Preprocessor\"].json;\nconst voiceCheck = $node[\"Voice Check\"].json;\nlet userInput = preprocessor.input_text;\ntry { const v = $node[\"Voice to Text\"].json; if (v && v.voice_transcribed) userInput = v.input_text; } catch(e) {}\nreturn { json: { user_id: preprocessor.user_id, chat_id: preprocessor.chat_id, user_input: userInput || `[Sent ${preprocessor.file_name || preprocessor.message_type}]`, agent_output: voiceCheck.output, message_type: preprocessor.message_type, file_id: preprocessor.file_id || null, voice_response: true, timestamp: new Date().toISOString() } };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6608,
+        96
+      ],
+      "id": "d04fca7e-6009-4b91-88f0-ce41effcafd0",
+      "name": "Format Save Data Voice"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const preprocessor = $node[\"Input Preprocessor\"].json;\nlet userInput = preprocessor.input_text;\ntry { const v = $node[\"Voice to Text\"].json; if (v && v.voice_transcribed) userInput = v.input_text; } catch(e) {}\nlet agentOutput = \"\";\ntry { agentOutput = $node[\"Voice Check\"].json.output || \"\"; } catch(e) { agentOutput = $json.output || \"\"; }\nreturn { json: { user_id: preprocessor.user_id, chat_id: preprocessor.chat_id, user_input: userInput || `[Sent ${preprocessor.file_name || preprocessor.message_type}]`, agent_output: agentOutput, message_type: preprocessor.message_type, file_id: preprocessor.file_id || null, voice_response: false, timestamp: new Date().toISOString() } };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5408,
+        544
+      ],
+      "id": "a5645e94-fe49-4379-a07e-be7c76c3eae9",
+      "name": "Format Save Data"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "msg-field",
+              "name": "Messages",
+              "value": "={{ $json.output }}",
+              "type": "string"
+            },
+            {
+              "id": "chat-field",
+              "name": "chat_id",
+              "value": "={{ $node[\"Input Preprocessor\"].json.chat_id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        5408,
+        336
+      ],
+      "id": "487785c5-512f-4314-9493-dd7adc0b40a6",
+      "name": "Convert Into Array"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "split-field",
+              "name": "Messages",
+              "value": "={{ String($json.Messages).split(\"\\n\\n\").filter(t => t.trim() !== \"\") }}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        5648,
+        336
+      ],
+      "id": "54c75faf-197a-4928-9079-fa1c8828613e",
+      "name": "Split Output"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "Messages",
+        "include": "allOtherFields",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        5888,
+        336
+      ],
+      "id": "ae34efe1-bebc-4c0b-9409-214d5eaf8fa7",
+      "name": "Split Out"
+    },
+    {
+      "parameters": {
+        "amount": "={{ (Math.random()*1.2)+0.3 }}"
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        6128,
+        576
+      ],
+      "id": "4c9524ff-061b-4de2-adaf-bef3dc98ce23",
+      "name": "Wait",
+      "webhookId": "0902fb21-a33f-49a0-8dc5-a15ab2e85b0d"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Convert Into Array').item.json.chat_id }}",
+        "text": "={{ String($json.Messages || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        6368,
+        416
+      ],
+      "id": "d505b524-7f47-4a51-bf75-c687d28a5f93",
+      "name": "Send Response",
+      "webhookId": "986d38c1-2e3b-41f4-874c-f7f8a0d6e3d4",
+      "credentials": {
+        "telegramApi": {
+          "id": "nr6VlcCoccUPE02J",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "collection": "Conversations",
+        "fields": "user_id,chat_id,user_input,agent_output,message_type,file_id,voice_response,timestamp",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.2,
+      "position": [
+        5888,
+        544
+      ],
+      "id": "459b5325-170a-4cdf-89ba-0d63de91d182",
+      "name": "Save Conversation",
+      "credentials": {
+        "mongoDb": {
+          "id": "MLdBOJwxchOTO5qK",
+          "name": "MongoDB account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "EwX0pYSSKD2H3Af9",
+          "mode": "id",
+          "cachedResultUrl": "/workflow/EwX0pYSSKD2H3Af9"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.1,
+      "position": [
+        6128,
+        720
+      ],
+      "id": "64468b17-954a-4eee-a70f-4873099edbb4",
+      "name": "Trigger Memory Pipeline",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $node['Input Preprocessor'].json.chat_id }}",
+        "text": "oops something went wrong on my end 😅\n\nwant me to try again?",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        5408,
+        736
+      ],
+      "id": "b00a770a-7cb4-44b3-8706-8af281af9990",
+      "name": "Orchestrator Error Msg",
+      "webhookId": "3ae8d36d-33f5-4fbf-a21b-8e10f39932a9",
+      "credentials": {
+        "telegramApi": {
+          "id": "nr6VlcCoccUPE02J",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chat_id }}",
+        "text": "uh! the Pipeline failed. HELPPPP",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        6272,
+        832
+      ],
+      "id": "911dbc29-2609-4b62-aeaf-35c17c0d745c",
+      "name": "Error",
+      "webhookId": "56468949-f812-45cc-bae8-e40a97a762d6",
+      "credentials": {
+        "telegramApi": {
+          "id": "nr6VlcCoccUPE02J",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "description": "Manage Google Docs (create documents, read content, write/append text, save quick notes). Build a COMPLETE instruction as Text. For quick notes say 'Note: [content]' or 'Save this: [content]'. For creating docs include the title. For reading include the doc ID or name. Examples — Good: 'Note: wifi password is ABC123'. Good: 'Create a doc titled Project Plan'. Bad: 'save it' (no content). Bad: 'create doc' (no title).",
+        "workflowId": {
+          "__rl": true,
+          "value": "kZ9xzyn90hh8uHDr",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Text": "={{ $fromAI('Text', 'Complete docs instruction with all details.', 'string') }}",
+            "Session ID": "={{ $('Telegram Trigger').item.json.message.chat.id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Text",
+              "displayName": "Text",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "Session ID",
+              "displayName": "Session ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        4416,
+        704
+      ],
+      "id": "069de54d-aacb-4625-936a-edcbec950b67",
+      "name": "Google_Docs"
+    },
+    {
+      "parameters": {
+        "description": "Manage Google Tasks (create tasks, set reminders with due dates/times, list pending tasks, complete, delete, update). Build a COMPLETE instruction as Text. For reminders include the exact date AND time. For completing/deleting include the task name. Examples — Good: 'Create reminder: Call John tomorrow at 5pm'. Good: 'Show all my pending tasks'. Good: 'Mark Buy groceries as complete'. Bad: 'add a task' (no title). Bad: 'complete it' (no task name).",
+        "workflowId": {
+          "__rl": true,
+          "value": "NI0zEKQvNNNX5MgV",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Text": "={{ $fromAI('Text', 'Complete task instruction with all details resolved from context.', 'string') }}",
+            "Session ID": "={{ $('Telegram Trigger').item.json.message.chat.id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Text",
+              "displayName": "Text",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "Session ID",
+              "displayName": "Session ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        4656,
+        704
+      ],
+      "id": "c745d567-80a8-4993-a044-6ca477813c2d",
+      "name": "Google_Tasks"
+    },
+    {
+      "parameters": {
+        "description": "Manage Google Drive (upload files, delete, rename, download). For UPLOADING: the file_id, file_name, and mime_type are passed automatically — just describe what to do. For DELETE/RENAME: include the file name or Drive URL so the tool can find it. Examples — Good: 'Upload this file to Google Drive'. Good: 'Delete the file at https://drive.google.com/file/d/abc123/view'. Good: 'Rename report.pdf to Q3_Report.pdf'. Bad: 'upload' (no context).",
+        "workflowId": {
+          "__rl": true,
+          "value": "PkxGb8eYzymL9C30",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Text": "={{ $fromAI('Text', 'Complete Drive instruction with all details.', 'string') }}",
+            "Session ID": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+            "file_id": "={{ $('Build Orchestrator Input').item.json.file_id || '' }}",
+            "file_name": "={{ $('Build Orchestrator Input').item.json.file_name || '' }}",
+            "mime_type": "={{ $('Build Orchestrator Input').item.json.mime_type || '' }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Text",
+              "displayName": "Text",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "Session ID",
+              "displayName": "Session ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "file_id",
+              "displayName": "file_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "file_name",
+              "displayName": "file_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "mime_type",
+              "displayName": "mime_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        4304,
+        704
+      ],
+      "id": "69c4ae0a-2a79-4aca-8503-58964388becc",
+      "name": "Google_Drive"
+    },
+    {
+      "parameters": {
+        "description": "Manage Gmail (send emails, search inbox, read emails, reply, delete, label/star, draft for review). Build a COMPLETE instruction as Text. For sending: include recipient email, subject, and body. For drafting a reply: include enough context to identify the email. For searching: describe what to look for (sender, subject, date range, unread). For replying/deleting: include enough detail to identify the email. The draft review will appear separately in Telegram with Send/Edit/Cancel buttons. Examples — Good: 'Send email to john@example.com subject Meeting Update body Hi John, the meeting is moved to 3pm.' Good: 'Draft a reply to the email from Sarah thanking her'. Good: 'Check my unread emails from today'. Good: 'Reply to the latest email from Sarah saying Thanks, noted.' Bad: 'send an email' (no recipient). Bad: 'reply to it' (no email identified).",
+        "workflowId": {
+          "__rl": true,
+          "value": "BxBkJyrELfAzZe0k",
+          "mode": "id",
+          "cachedResultUrl": "/workflow/BxBkJyrELfAzZe0k"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Text": "={{ $fromAI('Text', 'Complete email instruction with all details resolved from context.', 'string') }}",
+            "Session ID": "={{ $('Telegram Trigger').item.json.message.chat.id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Text",
+              "displayName": "Text",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "Session ID",
+              "displayName": "Session ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        4192,
+        704
+      ],
+      "id": "90e04fa1-a128-4a62-98ac-929903ca9e83",
+      "name": "Gmail"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Typing Start",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Typing Start": {
+      "main": [
+        [
+          {
+            "node": "Input Preprocessor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Input Preprocessor": {
+      "main": [
+        [
+          {
+            "node": "Is Command?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Command?": {
+      "main": [
+        [
+          {
+            "node": "Command Router",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Rate Limit Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Command Router": {
+      "main": [
+        [
+          {
+            "node": "Start Message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Help Message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Clear History",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Voice Usage Query",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Unknown Command",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clear History": {
+      "main": [
+        [
+          {
+            "node": "Clear Confirm",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Voice Usage Query": {
+      "main": [
+        [
+          {
+            "node": "Voice Usage Count",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Voice Usage Count": {
+      "main": [
+        [
+          {
+            "node": "Voice Usage Msg",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rate Limit Query": {
+      "main": [
+        [
+          {
+            "node": "Rate Limit Count",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rate Limit Count": {
+      "main": [
+        [
+          {
+            "node": "Rate Limited?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rate Limited?": {
+      "main": [
+        [
+          {
+            "node": "Rate Limited Msg",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Auth Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Auth Check": {
+      "main": [
+        [
+          {
+            "node": "Is Sticker?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reject Unauthorized",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Sticker?": {
+      "main": [
+        [
+          {
+            "node": "Pick Sticker Reply",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Unsupported Type?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pick Sticker Reply": {
+      "main": [
+        [
+          {
+            "node": "Send Sticker Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Unsupported Type?": {
+      "main": [
+        [
+          {
+            "node": "Unsupported Message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Is Voice?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Voice?": {
+      "main": [
+        [
+          {
+            "node": "Download Voice",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Has File?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Voice": {
+      "main": [
+        [
+          {
+            "node": "Whisper STT",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Whisper STT": {
+      "main": [
+        [
+          {
+            "node": "Voice to Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Voice to Text": {
+      "main": [
+        [
+          {
+            "node": "Voice OK?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Voice OK?": {
+      "main": [
+        [
+          {
+            "node": "Voice Failed Msg",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Check Pending File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has File?": {
+      "main": [
+        [
+          {
+            "node": "Typing File",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Check Pending File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Typing File": {
+      "main": [
+        [
+          {
+            "node": "Download File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download File": {
+      "main": [
+        [
+          {
+            "node": "File Type Switch",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "File Download Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "File Type Switch": {
+      "main": [
+        [
+          {
+            "node": "Doc Type Switch",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "IMG Metadata",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Unsupported File Msg",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Doc Type Switch": {
+      "main": [
+        [
+          {
+            "node": "PDF Extractor",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "TXT Metadata",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Unsupported File Msg",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PDF Extractor": {
+      "main": [
+        [
+          {
+            "node": "PDF Metadata",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PDF Metadata": {
+      "main": [
+        [
+          {
+            "node": "Has Caption?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TXT Metadata": {
+      "main": [
+        [
+          {
+            "node": "Has Caption?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IMG Metadata": {
+      "main": [
+        [
+          {
+            "node": "Has Caption?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Caption?": {
+      "main": [
+        [
+          {
+            "node": "Build File Context",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare Pending",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build File Context": {
+      "main": [
+        [
+          {
+            "node": "Typing Pre-History",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Pending": {
+      "main": [
+        [
+          {
+            "node": "Delete Old Pending",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete Old Pending": {
+      "main": [
+        [
+          {
+            "node": "Save Pending File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Pending File": {
+      "main": [
+        [
+          {
+            "node": "Ask What To Do",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Pending File": {
+      "main": [
+        [
+          {
+            "node": "Process Pending",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Pending": {
+      "main": [
+        [
+          {
+            "node": "Is Followup?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Followup?": {
+      "main": [
+        [
+          {
+            "node": "Delete Processed Pending",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Typing Pre-History",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete Processed Pending": {
+      "main": [
+        [
+          {
+            "node": "Typing Pre-History",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Typing Pre-History": {
+      "main": [
+        [
+          {
+            "node": "Load Chat History",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Chat History": {
+      "main": [
+        [
+          {
+            "node": "Format Chat History",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Chat History": {
+      "main": [
+        [
+          {
+            "node": "Fetch Memory Doc",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Memory Doc": {
+      "main": [
+        [
+          {
+            "node": "Build Orchestrator Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Orchestrator Input": {
+      "main": [
+        [
+          {
+            "node": "Typing Pre-AI",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Typing Refresh 1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Typing Pre-AI": {
+      "main": [
+        [
+          {
+            "node": "Orchestrator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Typing Refresh 1": {
+      "main": [
+        [
+          {
+            "node": "Wait 4s",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 4s": {
+      "main": [
+        [
+          {
+            "node": "Typing Refresh 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Typing Refresh 2": {
+      "main": [
+        [
+          {
+            "node": "Wait 4s Again",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 4s Again": {
+      "main": [
+        [
+          {
+            "node": "Typing Refresh 3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Orchestrator": {
+      "main": [
+        [
+          {
+            "node": "Take Last Item",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Orchestrator Error Msg",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GPT 5-mini Orchestrator": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Orchestrator",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google_Sheets": {
+      "ai_tool": [
+        [
+          {
+            "node": "Orchestrator",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google_Calendar": {
+      "ai_tool": [
+        [
+          {
+            "node": "Orchestrator",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wikipedia": {
+      "ai_tool": [
+        [
+          {
+            "node": "Orchestrator",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Memory_Recall": {
+      "ai_tool": [
+        [
+          {
+            "node": "Orchestrator",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Take Last Item": {
+      "main": [
+        [
+          {
+            "node": "Voice Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Voice Check": {
+      "main": [
+        [
+          {
+            "node": "Should Voice?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Should Voice?": {
+      "main": [
+        [
+          {
+            "node": "Voice Limit Check",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Convert Into Array",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Format Save Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Voice Limit Check": {
+      "main": [
+        [
+          {
+            "node": "Voice Limit OK?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Voice Limit OK?": {
+      "main": [
+        [
+          {
+            "node": "IF Voice Allowed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Voice Allowed": {
+      "main": [
+        [
+          {
+            "node": "Generate Audio",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Prep Voice Log",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Convert Into Array",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Format Save Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Audio": {
+      "main": [
+        [
+          {
+            "node": "Send Voice Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prep Voice Log": {
+      "main": [
+        [
+          {
+            "node": "Log Voice Usage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Voice Response": {
+      "main": [
+        [
+          {
+            "node": "Format Save Data Voice",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Save Data Voice": {
+      "main": [
+        [
+          {
+            "node": "Save Conversation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Save Data": {
+      "main": [
+        [
+          {
+            "node": "Save Conversation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert Into Array": {
+      "main": [
+        [
+          {
+            "node": "Split Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Output": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Send Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Conversation": {
+      "main": [
+        [
+          {
+            "node": "Trigger Memory Pipeline",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trigger Memory Pipeline": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google_Docs": {
+      "ai_tool": [
+        [
+          {
+            "node": "Orchestrator",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google_Tasks": {
+      "ai_tool": [
+        [
+          {
+            "node": "Orchestrator",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google_Drive": {
+      "ai_tool": [
+        [
+          {
+            "node": "Orchestrator",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail": {
+      "ai_tool": [
+        [
+          {
+            "node": "Orchestrator",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "4edbdb42-0511-4d52-a162-377c51e4a6be",
+  "meta": {
+    "instanceId": "d8d542fa04d8b4edae4747c08c0777b8d5a665f45b24665e01e455e752d9c276"
+  },
+  "id": "j7XHgwopyqH57EZ0",
+  "tags": []
+}

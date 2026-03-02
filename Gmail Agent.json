@@ -1,0 +1,419 @@
+{
+  "name": "Gmail Agent",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "Text"
+            },
+            {
+              "name": "Session ID"
+            },
+            {
+              "name": "callback_data",
+              "type": "any"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -1824,
+        -224
+      ],
+      "id": "6fc34e62-e95f-486a-9206-2f8ccde9a17b",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.Text }}",
+        "options": {
+          "systemMessage": "=You are a Gmail executor. Parse the request, call the right tool, return result.\n\nCurrent: {{ $now.setZone('Asia/Kolkata').format('yyyy-MM-dd HH:mm:ss') }} IST\nTimezone: Asia/Kolkata (+05:30)\n\n=== TOOLS ===\nSend_Email → Send new email immediately. Requires: To, Subject, Message.\nReply_To_Email → Reply to existing email. Requires: Message_ID, Message.\nDelete_Email → Trash an email. Requires: Message_ID.\nGet_Email → Read full email content. Requires: Message_ID.\nGet_Many_Emails → Search/list emails. Optional: Query, Limit (default 10).\nAdd_Label → Label an email. Requires: Message_ID, Label name.\nSave_Draft → Save a draft email for user review. The draft will appear in Telegram with Send/Edit/Cancel buttons. Use this when:\n  - Composing a reply to a received email\n  - User says 'draft a reply', 'compose a response', 'write back'\n  - Any email the user should review before sending\n  After calling → return: 'Draft sent for review ✓'\n\n=== EMAIL CONTEXT ===\nThe conversation history may contain [EMAIL_ALERT] entries:\n  [EMAIL_ALERT] From: Name <email> | Subject: ... | ID: <messageId> | Thread: <threadId> | Snippet: ...\n\nWhen user says 'it', 'that email', 'reply to it' → use the most recent [EMAIL_ALERT].\nMessage_ID is already there → use directly. Do NOT call Get_Many_Emails.\n\n=== RULES ===\n1. SEND IMMEDIATELY when user gives clear recipient + subject + body, or says 'send now'\n2. SAVE DRAFT when composing replies or when user should review first\n3. Gmail search: from:x | subject:X | is:unread | newer_than:2d\n4. NEVER guess a Message_ID. Never expose IDs to user.\n5. Keep responses short: 'Sent ✓' | 'Replied ✓' | 'Deleted ✓' | 'Draft sent for review ✓'"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -1632,
+        -224
+      ],
+      "id": "73aafcc4-3c0d-4e27-b80a-8f90a9450fc4",
+      "name": "Gmail AI"
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('When Executed by Another Workflow').item.json['Session ID'] }}",
+        "contextWindowLength": 10
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        -1552,
+        16
+      ],
+      "id": "e318bb5c-29be-4892-a986-744b994f9e97",
+      "name": "Simple Memory"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $fromAI('To', 'Recipient email address.', 'string') }}",
+        "subject": "={{ $fromAI('Subject', 'Email subject line.', 'string') }}",
+        "message": "={{ $fromAI('Message', 'Email body text.', 'string') }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmailTool",
+      "typeVersion": 2.2,
+      "position": [
+        -1392,
+        16
+      ],
+      "id": "c9c03d8b-7061-4775-a1bc-af3fa928b452",
+      "name": "Send_Email",
+      "webhookId": "dbce9fc1-8c21-4323-9511-e2a76ce0aaf1",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "gRhODzLcUX88sjLS",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "reply",
+        "messageId": "={{ $fromAI('Message_ID', 'Gmail message ID to reply to.', 'string') }}",
+        "message": "={{ $fromAI('Message', 'The reply message body.', 'string') }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmailTool",
+      "typeVersion": 2.2,
+      "position": [
+        -1232,
+        16
+      ],
+      "id": "757944be-0440-4684-8659-ee41de0bf096",
+      "name": "Reply_To_Email",
+      "webhookId": "033cf014-d722-4ff8-ad57-ea2b3080e78b",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "gRhODzLcUX88sjLS",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "delete",
+        "messageId": "={{ $fromAI('Message_ID', 'Gmail message ID to delete.', 'string') }}"
+      },
+      "type": "n8n-nodes-base.gmailTool",
+      "typeVersion": 2.2,
+      "position": [
+        -1072,
+        16
+      ],
+      "id": "31979773-4c2e-4ecc-845c-de660e379d70",
+      "name": "Delete_Email",
+      "webhookId": "2a643f03-83bc-4d31-8fc9-fb02f09ea2ed",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "gRhODzLcUX88sjLS",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "messageId": "={{ $fromAI('Message_ID', 'Gmail message ID to read.', 'string') }}"
+      },
+      "type": "n8n-nodes-base.gmailTool",
+      "typeVersion": 2.2,
+      "position": [
+        -912,
+        16
+      ],
+      "id": "0da94ba9-29b7-4b88-b201-5352317cabb2",
+      "name": "Get_Email",
+      "webhookId": "ef92b0bb-ad6d-4be1-b799-ffca9584745d",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "gRhODzLcUX88sjLS",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "limit": "={{ $fromAI('Limit', 'Number of emails. Default 10.', 'number') }}",
+        "filters": {
+          "q": "={{ $fromAI('Query', 'Gmail search query.', 'string') }}"
+        }
+      },
+      "type": "n8n-nodes-base.gmailTool",
+      "typeVersion": 2.2,
+      "position": [
+        -752,
+        16
+      ],
+      "id": "2dff1767-8c92-4d32-9eba-76f0771b9044",
+      "name": "Get_Many_Emails",
+      "webhookId": "1d28ab68-e021-434d-9459-79ba6eeb50cc",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "gRhODzLcUX88sjLS",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "addLabels",
+        "messageId": "={{ $fromAI('Message_ID', 'Gmail message ID to label.', 'string') }}",
+        "labelIds": "={{ $fromAI('Label_IDs', 'Label: STARRED, IMPORTANT, UNREAD, SPAM, TRASH.', 'string') }}"
+      },
+      "type": "n8n-nodes-base.gmailTool",
+      "typeVersion": 2.2,
+      "position": [
+        -592,
+        16
+      ],
+      "id": "9b363a10-5212-47dc-833b-e07bd91e953d",
+      "name": "Add_Label",
+      "webhookId": "82d56019-0e0b-44f8-92b4-fbee6ad79bc2",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "gRhODzLcUX88sjLS",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "description": "Save a draft email to the database for user review. A separate system will show it in Telegram with Send/Edit/Cancel buttons. Use this when composing replies or any email the user should review before sending. After calling, return: Draft sent for review ✓",
+        "workflowId": {
+          "__rl": true,
+          "value": "YxHsv25wR1Ogdtrd",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "to_email": "={{ $fromAI('to_email', 'Recipient email address.', 'string') }}",
+            "subject": "={{ $fromAI('subject', 'Subject line.', 'string') }}",
+            "draft_body": "={{ $fromAI('draft_body', 'Full composed email body. Write a professional, well-crafted email.', 'string') }}",
+            "reply_to_id": "={{ $fromAI('reply_to_id', 'Gmail Message_ID if replying. Empty string if new email.', 'string') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "to_email",
+              "displayName": "to_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "subject",
+              "displayName": "subject",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "draft_body",
+              "displayName": "draft_body",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "reply_to_id",
+              "displayName": "reply_to_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        -432,
+        16
+      ],
+      "id": "4ca8c9cb-f5da-4f8a-a772-e9f10f186b7e",
+      "name": "Save_Draft"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        -1712,
+        16
+      ],
+      "id": "db683bdd-2777-444d-9dd6-68f24e7dcf41",
+      "name": "GPT-4o-mini1",
+      "credentials": {
+        "openAiApi": {
+          "id": "EbPfZvscveKnxoX8",
+          "name": "OpenAi account 2"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Gmail AI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "Gmail AI",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send_Email": {
+      "ai_tool": [
+        [
+          {
+            "node": "Gmail AI",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reply_To_Email": {
+      "ai_tool": [
+        [
+          {
+            "node": "Gmail AI",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete_Email": {
+      "ai_tool": [
+        [
+          {
+            "node": "Gmail AI",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get_Email": {
+      "ai_tool": [
+        [
+          {
+            "node": "Gmail AI",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get_Many_Emails": {
+      "ai_tool": [
+        [
+          {
+            "node": "Gmail AI",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add_Label": {
+      "ai_tool": [
+        [
+          {
+            "node": "Gmail AI",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save_Draft": {
+      "ai_tool": [
+        [
+          {
+            "node": "Gmail AI",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GPT-4o-mini1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Gmail AI",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "796c719a-af42-4e40-9b11-0cfa4b433e09",
+  "meta": {
+    "instanceId": "d8d542fa04d8b4edae4747c08c0777b8d5a665f45b24665e01e455e752d9c276"
+  },
+  "id": "BxBkJyrELfAzZe0k",
+  "tags": []
+}

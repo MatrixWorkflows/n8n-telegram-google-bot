@@ -1,0 +1,201 @@
+{
+  "name": "48-H Cleanup",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 24
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        336,
+        -240
+      ],
+      "id": "c2cc9295-ba41-4f98-8442-031c8c2ba0d4",
+      "name": "Daily Cleanup Trigger"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "documentURL": "1Z-H-5ocNfqFM-wOZugKpu47UfFH_J9YBEtHROZH7qJA"
+      },
+      "type": "n8n-nodes-base.googleDocs",
+      "typeVersion": 2,
+      "position": [
+        576,
+        -240
+      ],
+      "id": "910f9f66-d2c3-4767-bb0c-bbac77bfe75f",
+      "name": "Fetch Memory Doc",
+      "credentials": {
+        "googleDocsOAuth2Api": {
+          "id": "kwnm16xCdn9EtJPH",
+          "name": "Google Docs account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "let docText = \"\";\ntry {\n  const content = $json.body?.content;\n  if (content && Array.isArray(content)) {\n    docText = content\n      .map(block => {\n        if (block.paragraph && block.paragraph.elements) {\n          return block.paragraph.elements\n            .map(el => el.textRun?.content || \"\")\n            .join(\"\");\n        }\n        return \"\";\n      })\n      .join(\"\")\n      .trim();\n  }\n} catch(e) {}\n\nreturn { json: { memory_text: docText } };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        816,
+        -240
+      ],
+      "id": "0a26fbd6-cc13-4216-91c9-a5a401c9f62e",
+      "name": "Parse Doc"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Current date: {{ $now.format('yyyy-MM-dd HH:mm:ss') }}\n\nMemory Document:\n{{ $json.memory_text }}",
+        "options": {
+          "systemMessage": "You are a memory cleanup agent. You maintain a personal memory document by removing stale temporal information.\n\nRULES:\n1. REMOVE entries in 'Recent Activity' that are older than 48 hours from the current date\n2. KEEP all permanent information (personal facts, preferences, people, passwords, work details)\n3. KEEP important dates and deadlines even if past (birthdays, anniversaries)\n4. If a recent activity reveals a permanent pattern, convert it to a preference:\n   - \"User woke up at 5am three days in a row\" → move to Preferences: \"User tends to wake up early around 5am\"\n5. Keep the document organized in the same sections\n6. Do NOT add any new information\n7. Do NOT change any permanent facts\n8. If nothing needs cleanup, return the document unchanged\n\nRETURN: The COMPLETE cleaned memory document. Nothing else."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1040,
+        -240
+      ],
+      "id": "1c52b9c9-7af3-4009-98fa-2f1754bca457",
+      "name": "Cleanup Agent"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-5-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-5-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        1008,
+        -48
+      ],
+      "id": "cdc4c107-67d6-4c63-9ab1-776b21e6d183",
+      "name": "GPT Cleanup",
+      "credentials": {
+        "openAiApi": {
+          "id": "EbPfZvscveKnxoX8",
+          "name": "OpenAi account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentURL": "1Z-H-5ocNfqFM-wOZugKpu47UfFH_J9YBEtHROZH7qJA",
+        "actionsUi": {
+          "actionFields": [
+            {
+              "action": "replaceAll",
+              "text": "={{ $json.output }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.googleDocs",
+      "typeVersion": 2,
+      "position": [
+        1360,
+        -240
+      ],
+      "id": "0d37a756-1781-4cd6-88d5-e8f8c0ebd151",
+      "name": "Write Cleaned Doc",
+      "credentials": {
+        "googleDocsOAuth2Api": {
+          "id": "kwnm16xCdn9EtJPH",
+          "name": "Google Docs account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Daily Cleanup Trigger": {
+      "main": [
+        [
+          {
+            "node": "Fetch Memory Doc",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Memory Doc": {
+      "main": [
+        [
+          {
+            "node": "Parse Doc",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Doc": {
+      "main": [
+        [
+          {
+            "node": "Cleanup Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cleanup Agent": {
+      "main": [
+        [
+          {
+            "node": "Write Cleaned Doc",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GPT Cleanup": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Cleanup Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "ff0f9e5d-acaa-4bdb-97a2-def2c932bb4d",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "d8d542fa04d8b4edae4747c08c0777b8d5a665f45b24665e01e455e752d9c276"
+  },
+  "id": "3BRQqqbYqhH2YPq1",
+  "tags": []
+}

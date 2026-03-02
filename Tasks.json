@@ -1,0 +1,336 @@
+{
+  "name": "Tasks",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "Text"
+            },
+            {
+              "name": "Session ID"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -208,
+        -48
+      ],
+      "id": "cd3b97f0-1c84-4ca9-9d21-a3233355141e",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.Text }}",
+        "options": {
+          "systemMessage": "=You are a Google Tasks executor. Parse the request → call the tool → return result.\n\nCurrent: {{ $now.setZone('Asia/Kolkata').format('yyyy-MM-dd HH:mm:ss') }} IST\nToday: {{ $now.setZone('Asia/Kolkata').format('EEEE, yyyy-MM-dd') }}\nTomorrow: {{ $now.setZone('Asia/Kolkata').plus(1, 'day').format('yyyy-MM-dd') }}\n\n=== TOOLS ===\nCreate_Task → Simple task without due date. Requires: Title. Optional: Notes.\nCreate_Reminder → Task WITH due date and optional reminder time. Requires: Title, Due (date). Optional: Notes.\nList_Tasks → List all incomplete tasks.\nComplete_Task → Mark a task as completed. Requires: Task_ID (from List_Tasks).\nDelete_Task → Delete a task. Requires: Task_ID (from List_Tasks).\nUpdate_Task → Update title or notes. Requires: Task_ID (from List_Tasks). Optional: Title, Notes.\n\n=== RULES ===\n\n1. ACT IMMEDIATELY. Never ask for confirmation.\n\n2. For Create_Task (no date/time mentioned):\n   - Just create with the title\n   - Example: \"add task: buy groceries\" → Create_Task(Title: \"Buy groceries\")\n\n3. For Create_Reminder (date/time mentioned, \"remind me\", \"due by\"):\n   - Set the Due date in RFC 3339 format: YYYY-MM-DDT00:00:00.000Z\n   - If user specifies a TIME for reminder, add to Notes: REMIND_AT:YYYY-MM-DDTHH:MM:SS+05:30\n   - Example: \"remind me to call John tomorrow at 5pm\"\n     → Title: \"Call John\"\n     → Due: \"{{ $now.setZone('Asia/Kolkata').plus(1, 'day').format('yyyy-MM-dd') }}T00:00:00.000Z\"\n     → Notes: \"REMIND_AT:{{ $now.setZone('Asia/Kolkata').plus(1, 'day').format('yyyy-MM-dd') }}T17:00:00+05:30\"\n   - Example: \"task: finish report by Friday\" (no specific time)\n     → Title: \"Finish report\"\n     → Due: \"2025-06-27T00:00:00.000Z\" (that Friday)\n     → Notes: \"\" (no REMIND_AT since no time specified)\n\n4. For Complete_Task / Delete_Task:\n   - ALWAYS call List_Tasks FIRST to find the Task_ID\n   - NEVER guess a Task_ID\n   - Match by title (fuzzy match is fine)\n\n5. For List_Tasks:\n   - Returns all incomplete tasks\n   - Format the response cleanly: title, due date if any, notes summary\n\n6. For Update_Task:\n   - Call List_Tasks first to get the Task_ID\n   - Only update the fields the user wants to change\n\n7. REMIND_AT format rules:\n   - ALWAYS use +05:30 offset (IST)\n   - NEVER use Z for reminder times\n   - Format: REMIND_AT:YYYY-MM-DDTHH:MM:SS+05:30\n   - This tag in Notes triggers automatic Telegram reminders\n\n8. After success, respond in under 15 words:\n   - Added \"Buy groceries\" ✓\n   - Reminder set: \"Call John\" tomorrow 5 PM ✓\n   - Completed \"Buy groceries\" ✓\n   - 3 pending tasks: [list]\n   - Deleted \"Old task\" ✓"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        192,
+        -48
+      ],
+      "id": "b83784d4-e52e-4733-b956-35521e0098de",
+      "name": "Tasks AI"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-5-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        -48,
+        160
+      ],
+      "id": "8955effb-d80e-47fc-be1b-616baed06cf7",
+      "name": "GPT 5-mini Tasks",
+      "credentials": {
+        "openAiApi": {
+          "id": "EbPfZvscveKnxoX8",
+          "name": "OpenAi account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('When Executed by Another Workflow').item.json['Session ID'] }}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        112,
+        160
+      ],
+      "id": "a903f0d2-a18b-42e8-819f-6429680e83a4",
+      "name": "Simple Memory"
+    },
+    {
+      "parameters": {
+        "task": "MTUwNzI3ODE0NTI1ODQwODg2ODQ6MDow",
+        "title": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Title', 'Task title. Extract from user message.', 'string') }}",
+        "additionalFields": {
+          "notes": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Notes', 'Optional notes. Empty string if none.', 'string') }}"
+        }
+      },
+      "type": "n8n-nodes-base.googleTasksTool",
+      "typeVersion": 1,
+      "position": [
+        272,
+        160
+      ],
+      "id": "8464ca64-3a36-4fa9-89a2-4d414a884a88",
+      "name": "Create_Task",
+      "credentials": {
+        "googleTasksOAuth2Api": {
+          "id": "roClChzCtYz6Sw3H",
+          "name": "Google Tasks account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "task": "MTUwNzI3ODE0NTI1ODQwODg2ODQ6MDow",
+        "title": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Title', 'Task title for the reminder.', 'string') }}",
+        "additionalFields": {
+          "dueDate": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Due', 'Due date in RFC 3339. Example: 2025-06-28T00:00:00.000Z. Date only, time goes in Notes.', 'string') }}",
+          "notes": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Notes', 'For timed reminders include REMIND_AT:YYYY-MM-DDTHH:MM:SS+05:30 tag. Empty string if no specific time.', 'string') }}"
+        }
+      },
+      "type": "n8n-nodes-base.googleTasksTool",
+      "typeVersion": 1,
+      "position": [
+        416,
+        160
+      ],
+      "id": "e44712ad-219a-4a15-8640-a4464bf57791",
+      "name": "Create_Reminder",
+      "credentials": {
+        "googleTasksOAuth2Api": {
+          "id": "roClChzCtYz6Sw3H",
+          "name": "Google Tasks account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "task": "MTUwNzI3ODE0NTI1ODQwODg2ODQ6MDow",
+        "returnAll": true,
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.googleTasksTool",
+      "typeVersion": 1,
+      "position": [
+        560,
+        160
+      ],
+      "id": "0945fc30-d2a2-4ab0-9a6e-3370c3ce9ed3",
+      "name": "List_Tasks",
+      "credentials": {
+        "googleTasksOAuth2Api": {
+          "id": "roClChzCtYz6Sw3H",
+          "name": "Google Tasks account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "task": "MTUwNzI3ODE0NTI1ODQwODg2ODQ6MDow",
+        "taskId": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Task_ID', 'Task ID from List_Tasks. NEVER guess.', 'string') }}",
+        "updateFields": {
+          "status": "completed"
+        }
+      },
+      "type": "n8n-nodes-base.googleTasksTool",
+      "typeVersion": 1,
+      "position": [
+        704,
+        160
+      ],
+      "id": "c97dd652-1262-4a5b-bb08-09d44ab9894d",
+      "name": "Complete_Task",
+      "credentials": {
+        "googleTasksOAuth2Api": {
+          "id": "roClChzCtYz6Sw3H",
+          "name": "Google Tasks account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "delete",
+        "task": "MTUwNzI3ODE0NTI1ODQwODg2ODQ6MDow",
+        "taskId": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Task_ID', 'Task ID from List_Tasks. NEVER guess.', 'string') }}"
+      },
+      "type": "n8n-nodes-base.googleTasksTool",
+      "typeVersion": 1,
+      "position": [
+        832,
+        160
+      ],
+      "id": "00c89fad-5326-45ae-b671-bc17ae26fabf",
+      "name": "Delete_Task",
+      "credentials": {
+        "googleTasksOAuth2Api": {
+          "id": "roClChzCtYz6Sw3H",
+          "name": "Google Tasks account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "task": "MTUwNzI3ODE0NTI1ODQwODg2ODQ6MDow",
+        "taskId": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Task_ID', 'Task ID from List_Tasks. NEVER guess.', 'string') }}",
+        "updateFields": {
+          "notes": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Notes', 'New notes. Pass current notes if not changing.', 'string') }}",
+          "title": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Title', 'New title. Pass current title if not changing.', 'string') }}"
+        }
+      },
+      "type": "n8n-nodes-base.googleTasksTool",
+      "typeVersion": 1,
+      "position": [
+        976,
+        160
+      ],
+      "id": "3b960897-3a52-44af-a4bf-b33ff7a99d08",
+      "name": "Update_Task",
+      "credentials": {
+        "googleTasksOAuth2Api": {
+          "id": "roClChzCtYz6Sw3H",
+          "name": "Google Tasks account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Tasks AI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GPT 5-mini Tasks": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Tasks AI",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "Tasks AI",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create_Task": {
+      "ai_tool": [
+        [
+          {
+            "node": "Tasks AI",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create_Reminder": {
+      "ai_tool": [
+        [
+          {
+            "node": "Tasks AI",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List_Tasks": {
+      "ai_tool": [
+        [
+          {
+            "node": "Tasks AI",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Complete_Task": {
+      "ai_tool": [
+        [
+          {
+            "node": "Tasks AI",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete_Task": {
+      "ai_tool": [
+        [
+          {
+            "node": "Tasks AI",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update_Task": {
+      "ai_tool": [
+        [
+          {
+            "node": "Tasks AI",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "d999e915-d03a-487a-9079-44b36e7ca8fb",
+  "meta": {
+    "instanceId": "d8d542fa04d8b4edae4747c08c0777b8d5a665f45b24665e01e455e752d9c276"
+  },
+  "id": "NI0zEKQvNNNX5MgV",
+  "tags": []
+}

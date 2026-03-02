@@ -1,0 +1,167 @@
+{
+  "name": "Smart Reminder",
+  "nodes": [
+    {
+      "parameters": {
+        "chatId": "6582818644",
+        "text": "={{ $json.message }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        112,
+        -448
+      ],
+      "id": "8e161a63-38ca-406d-bc78-2bb0e7b9d87a",
+      "name": "Send Reminder",
+      "webhookId": "c6f2684f-86a6-45bb-88d2-22faaae133f5",
+      "credentials": {
+        "telegramApi": {
+          "id": "nr6VlcCoccUPE02J",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "task": "MTUwNzI3ODE0NTI1ODQwODg2ODQ6MDow",
+        "taskId": "={{ $json.taskId }}",
+        "updateFields": {
+          "notes": "={{ $json.updatedNotes }}"
+        }
+      },
+      "type": "n8n-nodes-base.googleTasks",
+      "typeVersion": 1,
+      "position": [
+        352,
+        -448
+      ],
+      "id": "c4943754-2ed4-4898-81c9-6c3b496f3223",
+      "name": "Mark As Reminded",
+      "credentials": {
+        "googleTasksOAuth2Api": {
+          "id": "roClChzCtYz6Sw3H",
+          "name": "Google Tasks account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "task": "MTUwNzI3ODE0NTI1ODQwODg2ODQ6MDow",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.googleTasks",
+      "typeVersion": 1,
+      "position": [
+        -368,
+        -448
+      ],
+      "id": "2d9b374e-b198-46d2-9b4b-60938675d9db",
+      "name": "Get All Tasks",
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleTasksOAuth2Api": {
+          "id": "roClChzCtYz6Sw3H",
+          "name": "Google Tasks account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -608,
+        -448
+      ],
+      "id": "c38368de-3797-41f5-b386-630b73c53c6e",
+      "name": "Every 5 Minutes"
+    },
+    {
+      "parameters": {
+        "jsCode": "const tasks = items;\nconst now = new Date();\nconst nowMs = now.getTime();\nconst fiveMinMs = 5 * 60 * 1000;\n\nconst dueReminders = [];\n\nfor (const task of tasks) {\n  const notes = task.json.notes || '';\n  const title = task.json.title || 'Untitled';\n  const taskId = task.json.id;\n  const status = task.json.status || '';\n  \n  // Skip completed tasks\n  if (status === 'completed') continue;\n  \n  // Skip if already reminded\n  if (notes.includes('REMINDED_AT:')) continue;\n  \n  // Find REMIND_AT tag\n  const match = notes.match(/REMIND_AT:(\\S+)/);\n  if (!match) continue;\n  \n  const remindAtStr = match[1];\n  let remindAt;\n  try {\n    remindAt = new Date(remindAtStr);\n  } catch (e) {\n    continue;\n  }\n  \n  if (isNaN(remindAt.getTime())) continue;\n  \n  const remindMs = remindAt.getTime();\n  \n  // Check if reminder is due (within the last 5 minutes or right now)\n  if (remindMs <= nowMs && remindMs > (nowMs - fiveMinMs)) {\n    const updatedNotes = notes.replace(\n      'REMIND_AT:' + remindAtStr,\n      'REMINDED_AT:' + remindAtStr\n    );\n    \n    // Format time for display\n    const timeStr = remindAt.toLocaleTimeString('en-IN', {\n      hour: '2-digit',\n      minute: '2-digit',\n      hour12: true,\n      timeZone: 'Asia/Kolkata'\n    });\n    \n    dueReminders.push({\n      json: {\n        taskId: taskId,\n        title: title,\n        timeStr: timeStr,\n        updatedNotes: updatedNotes,\n        message: '⏰ Reminder: ' + title + '\\n🕐 ' + timeStr + ' IST'\n      }\n    });\n  }\n}\n\nif (dueReminders.length === 0) {\n  return [];\n}\n\nreturn dueReminders;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -128,
+        -448
+      ],
+      "id": "3d42f1af-3d82-4ba4-9863-2f07dd676cb0",
+      "name": "Filter Due Reminders"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Send Reminder": {
+      "main": [
+        [
+          {
+            "node": "Mark As Reminded",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get All Tasks": {
+      "main": [
+        [
+          {
+            "node": "Filter Due Reminders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Every 5 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Get All Tasks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Due Reminders": {
+      "main": [
+        [
+          {
+            "node": "Send Reminder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "3054befb-fd8b-4755-90f7-839b4dc66cac",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "d8d542fa04d8b4edae4747c08c0777b8d5a665f45b24665e01e455e752d9c276"
+  },
+  "id": "KxwFdVSDuDj7vn3w",
+  "tags": []
+}

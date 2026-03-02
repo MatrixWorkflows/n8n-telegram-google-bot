@@ -1,0 +1,552 @@
+{
+  "name": "Memory Pipeline",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "user_id"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        4928,
+        496
+      ],
+      "id": "e3632708-6d13-40db-933c-b432d538c596",
+      "name": "Pipeline Trigger"
+    },
+    {
+      "parameters": {
+        "amount": 10,
+        "unit": "minutes"
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        5216,
+        496
+      ],
+      "id": "40f2d593-b6e5-4ca1-8a42-3f684c45c2ee",
+      "name": "Wait 10 Minutes",
+      "webhookId": "mem-pipe-wait-hook"
+    },
+    {
+      "parameters": {
+        "collection": "Conversations",
+        "options": {
+          "limit": 1,
+          "sort": "{ \"timestamp\": -1 }"
+        },
+        "query": "={ \"user_id\": {{ $json.user_id }} }"
+      },
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.2,
+      "position": [
+        5472,
+        496
+      ],
+      "id": "05dc2972-d8e7-4b52-a2a3-f02c662e3c94",
+      "name": "Check Last Message",
+      "alwaysOutputData": true,
+      "credentials": {
+        "mongoDb": {
+          "id": "MLdBOJwxchOTO5qK",
+          "name": "MongoDB account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const lastMsg = $json;\nconst tenMinAgo = new Date(Date.now() - 10 * 60 * 1000);\nconst lastTime = lastMsg.timestamp ? new Date(lastMsg.timestamp) : null;\nconst stillChatting = lastTime && lastTime >= tenMinAgo;\nreturn {\n  json: {\n    still_chatting: stillChatting,\n    user_id: $node['Pipeline Trigger'].json.user_id || lastMsg.user_id\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5728,
+        496
+      ],
+      "id": "7d44e2f1-6a4b-41a9-9fc6-cbe7a1cd9b54",
+      "name": "Still Chatting?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "chat-active",
+              "leftValue": "={{ $json.still_chatting }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        5952,
+        496
+      ],
+      "id": "24206e90-4658-469b-9b1a-544ada043ba8",
+      "name": "IF Still Active"
+    },
+    {
+      "parameters": {
+        "collection": "Conversations",
+        "options": {
+          "limit": 35,
+          "sort": "{ \"timestamp\": -1 }"
+        },
+        "query": "={ \"user_id\": {{ $json.user_id }} }"
+      },
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.2,
+      "position": [
+        6192,
+        576
+      ],
+      "id": "45a43a06-ed32-4fb5-9235-1150792aa0de",
+      "name": "Fetch Last 35 Messages",
+      "credentials": {
+        "mongoDb": {
+          "id": "MLdBOJwxchOTO5qK",
+          "name": "MongoDB account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const msgs = [...items].reverse();\nconst formatted = msgs.map(item => {\n  const parts = [];\n  if (item.json.user_input) parts.push('User: ' + item.json.user_input);\n  if (item.json.agent_output) parts.push('Cleo: ' + item.json.agent_output);\n  return parts.join('\\n');\n}).join('\\n\\n');\n\nreturn [{ json: { conversation_text: formatted, user_id: msgs[0]?.json?.user_id } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6432,
+        576
+      ],
+      "id": "834f410b-1569-407c-a6ed-0dd713944fb2",
+      "name": "Format Messages"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Conversation:\n{{ $json.conversation_text }}",
+        "options": {
+          "systemMessage": "You are a memory evaluation agent. Analyze this conversation and determine if it contains personal information worth remembering about the user.\n\nWORTH REMEMBERING:\n- Personal facts (name, birthday, age, location)\n- Preferences (likes, dislikes, habits)\n- Important people (friends, family, colleagues — names and context)\n- Work/project details\n- Passwords, credentials, account info\n- Goals, plans, deadlines\n- Daily activities with timestamps (\"woke up at 5am\", \"had coffee\")\n- Emotional states or important life events\n- Any explicit \"remember this\" requests\n\nNOT WORTH REMEMBERING:\n- Generic tool usage (\"upload this file\", \"check calendar\")\n- Wikipedia lookups with no personal relevance\n- Greetings and small talk with no personal info\n- Repeated info already likely stored\n\nRESPOND WITH ONLY:\n- \"MEMORABLE\" followed by a brief list of what to store\n- OR \"SKIP\" if nothing worth remembering\n\nExample:\nMEMORABLE\n- User's friend Ali is a developer\n- User prefers morning meetings\n- User woke up at 5am today"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        6672,
+        576
+      ],
+      "id": "cfd3f993-ce10-415d-a62b-700fd9bea988",
+      "name": "Evaluate Memory"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4.1-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-4.1-mini"
+        },
+        "builtInTools": {},
+        "options": {
+          "temperature": 0.1
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        6672,
+        800
+      ],
+      "id": "72d679b4-10d0-4bf7-9f7f-95f75e9e4e6c",
+      "name": "GPT Eval",
+      "credentials": {
+        "openAiApi": {
+          "id": "EbPfZvscveKnxoX8",
+          "name": "OpenAi account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const output = $json.output || '';\nconst isMemorable = output.toUpperCase().startsWith('MEMORABLE');\n\nreturn {\n  json: {\n    is_memorable: isMemorable,\n    evaluation: output,\n    user_id: $node['Format Messages'].json.user_id,\n    conversation_text: $node['Format Messages'].json.conversation_text\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6944,
+        576
+      ],
+      "id": "3e01b64c-c135-41fc-b6b5-6adeb3b24943",
+      "name": "Check Evaluation"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "is-memorable",
+              "leftValue": "={{ $json.is_memorable }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        7152,
+        576
+      ],
+      "id": "61330dce-43d4-4aca-90f1-d7b25524a5a4",
+      "name": "IF Memorable"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "documentURL": "1Z-H-5ocNfqFM-wOZugKpu47UfFH_J9YBEtHROZH7qJA"
+      },
+      "type": "n8n-nodes-base.googleDocs",
+      "typeVersion": 2,
+      "position": [
+        7392,
+        496
+      ],
+      "id": "dff1cd5a-0a06-419b-ba9e-6b611cba083c",
+      "name": "Fetch Current Memory",
+      "credentials": {
+        "googleDocsOAuth2Api": {
+          "id": "kwnm16xCdn9EtJPH",
+          "name": "Google Docs account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "let docText = '';\nlet docEndIndex = 2;\ntry {\n  const content = $json.body?.content;\n  if (content && Array.isArray(content)) {\n    docText = content\n      .map(block => {\n        if (block.paragraph && block.paragraph.elements) {\n          return block.paragraph.elements\n            .map(el => el.textRun?.content || '')\n            .join('');\n        }\n        return '';\n      })\n      .join('')\n      .trim();\n    \n    // Get the actual end index from the document body\n    const lastElement = content[content.length - 1];\n    if (lastElement && lastElement.endIndex) {\n      docEndIndex = lastElement.endIndex;\n    } else {\n      docEndIndex = Math.max(docText.length + 1, 2);\n    }\n  }\n} catch(e) {}\n\nconst evalData = $node['Check Evaluation'].json;\n\nreturn {\n  json: {\n    current_memory: docText,\n    doc_end_index: docEndIndex,\n    evaluation: evalData.evaluation,\n    conversation_text: evalData.conversation_text\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        7632,
+        496
+      ],
+      "id": "f7ced663-5590-41ab-8223-4db9cfe1867e",
+      "name": "Parse Current Memory"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Current Memory Document:\n{{ $json.current_memory }}\n\nNew information to merge (from evaluation):\n{{ $json.evaluation }}\n\nRecent conversation for context:\n{{ $json.conversation_text }}",
+        "options": {
+          "systemMessage": "You are a memory refinement agent. You maintain a concise personal memory document.\n\nRULES:\n1. Merge new information into the existing document\n2. Keep entries concise — one clear sentence or bullet per fact\n3. Remove exact duplicates\n4. If new info contradicts old info, keep the newer version\n5. Organize by sections:\n\n### Personal Info\n### Preferences\n### Important People\n### Work & Projects\n### Important Dates\n### Credentials & Passwords\n### Recent Activity (with timestamps)\n### Miscellaneous\n\n6. Maximum 1200 words. If exceeding, trim least important entries\n7. Write in third person: \"User prefers...\", \"User's friend Ali...\"\n8. For Recent Activity items, include the date/time\n9. Be factual. No opinions\n10. If no new info to add, return document unchanged\n\nRETURN: The COMPLETE updated memory document. Nothing else. No explanations. No markdown code blocks. Just the plain text document."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        7872,
+        496
+      ],
+      "id": "5c67f5b9-ef26-4abf-b884-aa284097e7d3",
+      "name": "Refine Memory"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4.1-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-4.1-mini"
+        },
+        "builtInTools": {},
+        "options": {
+          "temperature": 0.1
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        7872,
+        720
+      ],
+      "id": "9a3c32b0-8fa0-4ba0-b4cd-1643e4dbdf79",
+      "name": "GPT Refine",
+      "credentials": {
+        "openAiApi": {
+          "id": "EbPfZvscveKnxoX8",
+          "name": "OpenAi account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const newContent = $json.output || 'No memories yet.';\nconst docEndIndex = $node['Parse Current Memory'].json.doc_end_index || 2;\nconst docId = '1Z-H-5ocNfqFM-wOZugKpu47UfFH_J9YBEtHROZH7qJA';\n\nconst requests = [];\n\n// Delete existing content if there is any\nif (docEndIndex > 2) {\n  requests.push({\n    deleteContentRange: {\n      range: {\n        startIndex: 1,\n        endIndex: docEndIndex - 1\n      }\n    }\n  });\n}\n\n// Insert new content at the beginning\nrequests.push({\n  insertText: {\n    location: { index: 1 },\n    text: newContent\n  }\n});\n\nreturn {\n  json: {\n    url: 'https://docs.googleapis.com/v1/documents/' + docId + ':batchUpdate',\n    body: JSON.stringify({ requests: requests })\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        8144,
+        496
+      ],
+      "id": "c1671a88-8aff-45b0-9a21-60936da94e95",
+      "name": "Prepare Doc Update"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.url }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDocsOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        8352,
+        496
+      ],
+      "id": "bb7d57e9-575b-47c0-9b51-2dadefeb00e2",
+      "name": "Write Memory Doc",
+      "credentials": {
+        "googleDocsOAuth2Api": {
+          "id": "kwnm16xCdn9EtJPH",
+          "name": "Google Docs account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Pipeline Trigger": {
+      "main": [
+        [
+          {
+            "node": "Wait 10 Minutes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 10 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Check Last Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Last Message": {
+      "main": [
+        [
+          {
+            "node": "Still Chatting?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Still Chatting?": {
+      "main": [
+        [
+          {
+            "node": "IF Still Active",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Still Active": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Fetch Last 35 Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Last 35 Messages": {
+      "main": [
+        [
+          {
+            "node": "Format Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Messages": {
+      "main": [
+        [
+          {
+            "node": "Evaluate Memory",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GPT Eval": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Evaluate Memory",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Evaluate Memory": {
+      "main": [
+        [
+          {
+            "node": "Check Evaluation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Evaluation": {
+      "main": [
+        [
+          {
+            "node": "IF Memorable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Memorable": {
+      "main": [
+        [
+          {
+            "node": "Fetch Current Memory",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Current Memory": {
+      "main": [
+        [
+          {
+            "node": "Parse Current Memory",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Current Memory": {
+      "main": [
+        [
+          {
+            "node": "Refine Memory",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GPT Refine": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Refine Memory",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Refine Memory": {
+      "main": [
+        [
+          {
+            "node": "Prepare Doc Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Doc Update": {
+      "main": [
+        [
+          {
+            "node": "Write Memory Doc",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "d768d49e-6b8b-41c7-8b79-eae048a1ad5c",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "d8d542fa04d8b4edae4747c08c0777b8d5a665f45b24665e01e455e752d9c276"
+  },
+  "id": "EwX0pYSSKD2H3Af9",
+  "tags": []
+}

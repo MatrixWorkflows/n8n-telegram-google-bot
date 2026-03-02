@@ -1,0 +1,272 @@
+{
+  "name": "Docs",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "Text"
+            },
+            {
+              "name": "Session ID"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        144,
+        256
+      ],
+      "id": "73ca3289-bae8-4b2b-86e1-cbb2b66f176d",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.Text }}",
+        "options": {
+          "systemMessage": "=You are a Google Docs executor. Parse the request → call the tool → return result.\n\nCurrent: {{ $now.setZone('Asia/Kolkata').format('yyyy-MM-dd HH:mm:ss') }} IST\nToday: {{ $now.setZone('Asia/Kolkata').format('EEEE, yyyy-MM-dd') }}\n\n=== TOOLS ===\nCreate_Doc → Create a new empty document. Requires: Title.\nGet_Doc → Read a document's content. Requires: Doc_ID_or_URL.\nUpdate_Doc → Insert text into any document. Requires: Doc_ID_or_URL, Text, Location (end/beginning).\nAppend_Notes → Append a note to the user's personal Quick Notes document. Requires: Text. Doc ID must be provided by user.\n\n=== RULES ===\n\n1. ACT IMMEDIATELY. Never ask for confirmation.\n\n2. For Append_Notes (quick notes, \"note this\", \"save this\", \"jot down\", \"remember this\"):\n   - Call Append_Notes with ONLY the text content\n   - ALWAYS prepend a timestamp: [YYYY-MM-DD HH:MM] before the note text\n   - Example: user says \"note: wifi password is ABC123\" → Text: \"\\n[{{ $now.setZone('Asia/Kolkata').format('yyyy-MM-dd HH:mm') }}] wifi password is ABC123\\n\"\n   - Always add \\n before and after for spacing\n\n3. For Create_Doc:\n   - Extract the title from the user's message\n   - If user also provides content, create the doc THEN call Update_Doc to write content into it\n   - Return the document URL after creation\n\n4. For Get_Doc:\n   - User provides a doc ID or URL\n   - Return the content in a readable format\n   - If content is very long, summarize the key points\n\n5. For Update_Doc:\n   - Default location is \"end\" unless user specifies otherwise\n   - Pass the exact text the user wants written\n\n6. After success, respond in under 15 words:\n   - Noted ✓\n   - Created \"Project Plan\" → [link]\n   - Updated doc ✓\n   - Doc content: [summary]\n\n7. NEVER expose document IDs, API details, or internal structure to the user."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        544,
+        256
+      ],
+      "id": "53307db6-de67-4a13-8674-7d05257d64dc",
+      "name": "Docs AI"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-5-mini"
+        },
+        "builtInTools": {},
+        "options": {
+          "temperature": 0.05
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        304,
+        464
+      ],
+      "id": "13307d76-54e5-4c23-a62b-d9621aa8da8a",
+      "name": "GPT 5-mini Docs",
+      "credentials": {
+        "openAiApi": {
+          "id": "EbPfZvscveKnxoX8",
+          "name": "OpenAi account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('When Executed by Another Workflow').item.json['Session ID'] }}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        464,
+        464
+      ],
+      "id": "9b66f782-ccaa-4ff4-b5e4-5b5e6568fb7d",
+      "name": "Simple Memory"
+    },
+    {
+      "parameters": {
+        "folderId": "default",
+        "title": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Title', 'The title for the new Google Doc. Extract from user message.', 'string') }}"
+      },
+      "type": "n8n-nodes-base.googleDocsTool",
+      "typeVersion": 2,
+      "position": [
+        624,
+        464
+      ],
+      "id": "a5a18e5e-2fcd-4a62-84dd-473181edf169",
+      "name": "Create_Doc",
+      "credentials": {
+        "googleDocsOAuth2Api": {
+          "id": "kwnm16xCdn9EtJPH",
+          "name": "Google Docs account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "documentURL": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Doc_ID_or_URL', 'The Google Doc ID or URL to read. Example: 1Z5XKQ0GZDY5BKhXqbKaFRbE7nIj8IrIEMl9EohBhok0', 'string') }}"
+      },
+      "type": "n8n-nodes-base.googleDocsTool",
+      "typeVersion": 2,
+      "position": [
+        768,
+        464
+      ],
+      "id": "64648fa9-2ecf-47fe-96b4-314388e5c0b2",
+      "name": "Get_Doc",
+      "credentials": {
+        "googleDocsOAuth2Api": {
+          "id": "kwnm16xCdn9EtJPH",
+          "name": "Google Docs account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentURL": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Doc_ID_or_URL', 'The Google Doc ID or URL to update.', 'string') }}",
+        "actionsUi": {
+          "actionFields": [
+            {
+              "action": "insertText"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.googleDocsTool",
+      "typeVersion": 2,
+      "position": [
+        912,
+        464
+      ],
+      "id": "78a7f6d0-fad1-4239-a3d9-9ab52b72bd36",
+      "name": "Update_Doc",
+      "credentials": {
+        "googleDocsOAuth2Api": {
+          "id": "kwnm16xCdn9EtJPH",
+          "name": "Google Docs account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentURL": "{{YOUR_GOOGLE_DOC_ID}}",
+        "actionsUi": {
+          "actionFields": [
+            {
+              "action": "insertText"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.googleDocsTool",
+      "typeVersion": 2,
+      "position": [
+        1056,
+        464
+      ],
+      "id": "18860e28-e1fa-4e1c-936d-2410acba5633",
+      "name": "Append_Notes",
+      "credentials": {
+        "googleDocsOAuth2Api": {
+          "id": "kwnm16xCdn9EtJPH",
+          "name": "Google Docs account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Docs AI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GPT 5-mini Docs": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Docs AI",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "Docs AI",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create_Doc": {
+      "ai_tool": [
+        [
+          {
+            "node": "Docs AI",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get_Doc": {
+      "ai_tool": [
+        [
+          {
+            "node": "Docs AI",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update_Doc": {
+      "ai_tool": [
+        [
+          {
+            "node": "Docs AI",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append_Notes": {
+      "ai_tool": [
+        [
+          {
+            "node": "Docs AI",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "8554330f-1fe5-4556-8cd6-625c1782a917",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "d8d542fa04d8b4edae4747c08c0777b8d5a665f45b24665e01e455e752d9c276"
+  },
+  "id": "kZ9xzyn90hh8uHDr",
+  "tags": []
+}

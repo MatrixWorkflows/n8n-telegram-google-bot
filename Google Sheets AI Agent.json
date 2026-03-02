@@ -1,0 +1,538 @@
+{
+  "name": "Google Sheets AI Agent",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "Text"
+            },
+            {
+              "name": "Session ID"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        -368
+      ],
+      "id": "ec79b5f9-b0c2-435d-819f-e5d745d9cd28",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "options": {
+          "responseMode": "lastNode"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        16,
+        -176
+      ],
+      "id": "b0a1eb4d-993d-46e8-b445-66a6f3c9861d",
+      "name": "When chat message received",
+      "webhookId": "c8915c71-8301-4ab9-9330-1abf67fcb99d"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "input-text-1",
+              "name": "input_text",
+              "value": "={{ $json.Text }}",
+              "type": "string"
+            },
+            {
+              "id": "session-id-1",
+              "name": "session_id",
+              "value": "={{ $json['Session ID'] }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        272,
+        -368
+      ],
+      "id": "9dd2a610-7c46-4e6b-8b60-09e7c7fa2f91",
+      "name": "Normalize_From_Workflow2"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "input-text-2",
+              "name": "input_text",
+              "value": "={{ $json.chatInput }}",
+              "type": "string"
+            },
+            {
+              "id": "session-id-2",
+              "name": "session_id",
+              "value": "chat_test_session",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        272,
+        -176
+      ],
+      "id": "88bcfbd5-c973-4abd-86e0-988847cadb51",
+      "name": "Normalize_From_Chat2"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.input_text }}",
+        "options": {
+          "systemMessage": "=You are a Google Sheets assistant.\n\nCurrent time: {{ $now.format('yyyy-MM-dd HH:mm:ss') }}\nToday: {{ $now.format('EEEE, MMMM dd, yyyy') }}\nTimezone: Asia/Kolkata (UTC+05:30)\n\nYou have these tools:\n- Get_Rows → Read/fetch rows from a sheet. Needs: Document (spreadsheet ID), Sheet (tab name or ID)\n- Update_Row → Update an existing row. Needs: Document, Sheet, row data matching column headers\n- Delete_Rows → Delete specific rows. Needs: Document, Sheet, Start_Row_Number, Number_of_Rows_to_Delete\n- Delete_Sheet → Delete an entire sheet/tab. Needs: Document, Sheet\n- Create_Sheet → Create a new tab inside an existing spreadsheet. Needs: Document, Title (new tab name)\n- Clear_Sheet → Clear all data from a sheet. Needs: Document, Sheet, Keep_First_Row (true/false)\n- Append_Or_Update_Row → Add a new row or update if match found. Needs: Document, Sheet, row data\n\n=== HOW TO DETERMINE THE SPREADSHEET ID (Document) ===\n\nDocument = the spreadsheet ID used in every tool call.\n\nFollow this priority order — use the FIRST one that applies:\n\n1. **Conversation memory**: If a spreadsheet ID was already used or established earlier in this conversation, reuse that same ID. Do NOT ask again.\n2. **User-provided URL**: If the user gives a URL like https://docs.google.com/spreadsheets/d/1AbC123xYz/edit → extract the ID between /d/ and /edit: Document = \"1AbC123xYz\". Remember it for all future messages.\n3. **User-provided raw ID**: If the user gives a raw ID string, use it directly. Remember it for all future messages.\n4. **Default spreadsheet**: If the user provides NO spreadsheet URL or ID (for example, they only mention a tab name, column data, or an action), ask the user for a spreadsheet URL or ID first.\n\nNEVER ask the user for a spreadsheet ID unless they explicitly say they want to work on a different spreadsheet and haven't provided the new one.\nNEVER guess or fabricate a Document ID.\n\n=== SHEET (TAB) PARAMETER ===\n\nSheet = the tab name (like \"Sheet1\", \"Expenses\") or tab ID (like \"0\" for first tab).\nDefault to \"Sheet1\" if user doesn't specify which tab.\nIf the user provides only a tab name (e.g., \"read Expenses\"), use that as the Sheet and resolve the Document using the priority order above.\n\n=== CORE RULES ===\n\n1. ACT IMMEDIATELY when all required info is present (which is almost always, thanks to the default ID).\n2. Do NOT ask for unnecessary confirmation.\n3. Do NOT ask for the spreadsheet ID if you can resolve it from memory or the default.\n4. Once a spreadsheet ID is established in the conversation (whether from the user or the default), reuse it for all follow-up requests.\n\n=== READING DATA ===\n\nUse Get_Rows to fetch data.\nPresent data as a clean readable table.\nIf large dataset (>20 rows) → summarize stats + show first and last few rows.\nNever dump raw JSON.\n\n=== ADDING DATA ===\n\nUse Append_Or_Update_Row to add new rows.\nData must match existing column headers.\nIf user says \"add: Name=John, Age=25, City=Mumbai\" → map to matching columns.\nIf column structure is unclear → call Get_Rows first to check headers, then add.\n\n=== UPDATING DATA ===\n\nUse Update_Row to modify existing rows.\nWorkflow for \"change John's age to 26\":\n1. Call Get_Rows to find John's row and see current data.\n2. Call Update_Row with the corrected data.\n\nOr use Append_Or_Update_Row if matching by a key column.\n\n=== DELETING ROWS ===\n\nUse Delete_Rows.\nStart_Row_Number = row index (0-based). 0 = header, 1 = first data row.\nNumber_of_Rows_to_Delete = how many to remove from that index.\n\"Delete the 3rd row\" → Start_Row_Number = 3, Number_of_Rows_to_Delete = 1.\nConfirm what was deleted.\n\n=== CLEARING DATA ===\n\nUse Clear_Sheet.\nKeep_First_Row = true → keep headers, clear data only (default).\nKeep_First_Row = false → clear everything including headers.\nOnly use false if user explicitly says \"clear everything\" or \"clear headers too\".\n\n=== CREATING TABS ===\n\nUse Create_Sheet to add a new tab inside an existing spreadsheet.\nNeeds: Document ID + Title for the new tab.\n\"Add a tab called Expenses\" → Create_Sheet with Title = \"Expenses\".\n\n=== DELETING TABS ===\n\nUse Delete_Sheet to remove an entire tab.\nAct immediately if user is clear.\n\n=== CONVERSATION FLOW ===\n\nExample 1 — User provides URL:\nUser: \"Read my sheet https://docs.google.com/spreadsheets/d/1x2y3z/edit\"\n→ Extract ID = 1x2y3z → Get_Rows → show data\n\nExample 2 — User provides only a tab name, no ID:\nUser: \"Read the Expenses tab\"\n→ No ID in memory, no ID provided → use default ID 1bAEwFhTvb4piuiXdLXJbP9hYQKjKSNuCMxGtP-LoTmw, Sheet = \"Expenses\" → Get_Rows → show data\n\nExample 3 — Follow-up:\nUser: \"Add a row: Name=Alice, Score=95\"\n→ Reuse same ID from memory → Append_Or_Update_Row\n\nExample 4 — No specifics at all:\nUser: \"Show me all data\"\n→ Use default ID, Sheet = \"Sheet1\" → Get_Rows → show data\n\n=== RESPONSE FORMAT ===\n\nReading → clean table format.\nAdding/updating/deleting → short confirmation of what changed.\nAlways concise. Never fabricate data."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        544,
+        -288
+      ],
+      "id": "23f2b0ec-9238-4d24-98cf-e582189cb8ca",
+      "name": "Sheets Agent1"
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $json.session_id }}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        640,
+        -64
+      ],
+      "id": "d44bab81-6f95-42b7-bfeb-348050235cd1",
+      "name": "Simple Memory1"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Document', 'The Google Sheets spreadsheet ID. Extract from URL if given. Example: from https://docs.google.com/spreadsheets/d/1AbC123xYz/edit the ID is 1AbC123xYz. NEVER guess.', 'string') }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Sheet', 'The sheet tab name like Sheet1 or Expenses. Default to Sheet1 if user does not specify.', 'string') }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.7,
+      "position": [
+        944,
+        -96
+      ],
+      "id": "e041f02b-0720-431d-8172-e518825d346f",
+      "name": "Get_Rows1",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "c0AXPgv6RSDobHjA",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Document', 'The Google Sheets spreadsheet ID. NEVER guess.', 'string') }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Sheet', 'Sheet tab name or ID. Default Sheet1.', 'string') }}",
+          "mode": "id"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.7,
+      "position": [
+        1104,
+        -96
+      ],
+      "id": "2759fc49-2de9-4fb5-a971-6262d1b9302c",
+      "name": "Update_Row1",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "c0AXPgv6RSDobHjA",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "delete",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Document', 'The Google Sheets spreadsheet ID. NEVER guess.', 'string') }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Sheet', 'Sheet tab name or ID. Default Sheet1.', 'string') }}",
+          "mode": "id"
+        },
+        "startIndex": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Start_Row_Number', 'Row index to start deleting (0-based). 0 = header, 1 = first data row. To delete 3rd data row use 3.', 'number') }}",
+        "numberToDelete": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Number_of_Rows_to_Delete', 'How many rows to delete from Start_Row_Number. Default 1.', 'number') }}"
+      },
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.7,
+      "position": [
+        1264,
+        -96
+      ],
+      "id": "0ecf557b-31ef-4fe6-bc0f-81a99502bdfb",
+      "name": "Delete_Rows1",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "c0AXPgv6RSDobHjA",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "remove",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Document', `The Google Sheets spreadsheet ID. NEVER guess.`, 'string') }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Sheet', `The tab name or ID to delete entirely.`, 'string') }}",
+          "mode": "id"
+        }
+      },
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.7,
+      "position": [
+        1424,
+        -96
+      ],
+      "id": "cede5f3b-b530-45bf-ac50-7d663657ee0c",
+      "name": "Delete_Sheet1",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "c0AXPgv6RSDobHjA",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Document', 'The spreadsheet ID to create a new tab in. NEVER guess.', 'string') }}",
+          "mode": "id"
+        },
+        "title": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Title', 'Name of the new tab. Extract exactly from user message. Example: Expenses, Q1 Report.', 'string') }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.7,
+      "position": [
+        1584,
+        -96
+      ],
+      "id": "0d1da749-694b-4408-9502-471f9fa76dbd",
+      "name": "Create_Sheet1",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "c0AXPgv6RSDobHjA",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "clear",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Document', 'The Google Sheets spreadsheet ID. NEVER guess.', 'string') }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Sheet', 'The tab name or ID to clear.', 'string') }}",
+          "mode": "id"
+        },
+        "keepFirstRow": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Keep_First_Row', 'true = keep headers, clear data only (default). false = clear everything.', 'boolean') }}"
+      },
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.7,
+      "position": [
+        1744,
+        -96
+      ],
+      "id": "d685e46d-ce8c-4a3c-aef0-0691401fde18",
+      "name": "Clear_Sheet1",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "c0AXPgv6RSDobHjA",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Document', 'The Google Sheets spreadsheet ID. NEVER guess.', 'string') }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Sheet', 'Sheet tab name or ID. Default Sheet1.', 'string') }}",
+          "mode": "id"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.7,
+      "position": [
+        1904,
+        -96
+      ],
+      "id": "93fc797e-9a5e-467f-b877-491530f44eb1",
+      "name": "Append_Or_Update_Row1",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "c0AXPgv6RSDobHjA",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-4o-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        480,
+        -64
+      ],
+      "id": "ca5dbbab-997d-4c7d-a5d4-1e1bf8e5b4f6",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "EbPfZvscveKnxoX8",
+          "name": "OpenAi account 2"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Normalize_From_Workflow2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "Normalize_From_Chat2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize_From_Workflow2": {
+      "main": [
+        [
+          {
+            "node": "Sheets Agent1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize_From_Chat2": {
+      "main": [
+        [
+          {
+            "node": "Sheets Agent1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory1": {
+      "ai_memory": [
+        [
+          {
+            "node": "Sheets Agent1",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get_Rows1": {
+      "ai_tool": [
+        [
+          {
+            "node": "Sheets Agent1",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update_Row1": {
+      "ai_tool": [
+        [
+          {
+            "node": "Sheets Agent1",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete_Rows1": {
+      "ai_tool": [
+        [
+          {
+            "node": "Sheets Agent1",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete_Sheet1": {
+      "ai_tool": [
+        [
+          {
+            "node": "Sheets Agent1",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create_Sheet1": {
+      "ai_tool": [
+        [
+          {
+            "node": "Sheets Agent1",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clear_Sheet1": {
+      "ai_tool": [
+        [
+          {
+            "node": "Sheets Agent1",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append_Or_Update_Row1": {
+      "ai_tool": [
+        [
+          {
+            "node": "Sheets Agent1",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Sheets Agent1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "87ef58e5-290b-4bdf-8e49-6bb5cd39c56d",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "d8d542fa04d8b4edae4747c08c0777b8d5a665f45b24665e01e455e752d9c276"
+  },
+  "id": "CS9gu4QNAlDLbzA8",
+  "tags": []
+}

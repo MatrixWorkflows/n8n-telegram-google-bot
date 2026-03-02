@@ -1,0 +1,141 @@
+{
+  "name": "Gmail - Draft Preview",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "to_email"
+            },
+            {
+              "name": "subject"
+            },
+            {
+              "name": "draft_body"
+            },
+            {
+              "name": "reply_to_id"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        16,
+        0
+      ],
+      "id": "55c899eb-59af-4f6b-8f2f-a7eb4f61c93f",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const d = $json;\nconst draftId = `draft_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;\n\nreturn {\n  json: {\n    draftId,\n    to_email: (d.to_email || '').trim(),\n    subject: (d.subject || '').trim(),\n    draft_body: (d.draft_body || '').trim(),\n    reply_to_id: (d.reply_to_id || '').trim(),\n    status: 'pending',\n    timestamp: new Date().toISOString()\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ],
+      "id": "576aa739-258f-4bd0-ac66-17320030c931",
+      "name": "Prep Draft"
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "collection": "email_drafts",
+        "fields": "draftId,to_email,subject,draft_body,reply_to_id,status,timestamp",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.2,
+      "position": [
+        448,
+        0
+      ],
+      "id": "949eea76-46be-43dc-bdd4-95439262d359",
+      "name": "Save Draft to DB1",
+      "credentials": {
+        "mongoDb": {
+          "id": "MLdBOJwxchOTO5qK",
+          "name": "MongoDB account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "result-1",
+              "name": "output",
+              "value": "Draft saved and sent for review ✓",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        672,
+        0
+      ],
+      "id": "dcfd4210-ad43-4e4b-b60e-5f44662f8b23",
+      "name": "Return Result1"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Prep Draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prep Draft": {
+      "main": [
+        [
+          {
+            "node": "Save Draft to DB1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Draft to DB1": {
+      "main": [
+        [
+          {
+            "node": "Return Result1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "60347d15-2ad2-4178-8328-2319559118e7",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "d8d542fa04d8b4edae4747c08c0777b8d5a665f45b24665e01e455e752d9c276"
+  },
+  "id": "YxHsv25wR1Ogdtrd",
+  "tags": []
+}

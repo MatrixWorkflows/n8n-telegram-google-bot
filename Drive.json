@@ -1,0 +1,421 @@
+{
+  "name": "Drive",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "Text"
+            },
+            {
+              "name": "Session ID"
+            },
+            {
+              "name": "file_id"
+            },
+            {
+              "name": "file_name"
+            },
+            {
+              "name": "mime_type"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        496,
+        -48
+      ],
+      "id": "0e7ee1f1-13d1-4e21-a2fc-bb0f9f4db2b5",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "file-id-check",
+              "leftValue": "={{ $json.file_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            },
+            {
+              "id": "file-id-none-check",
+              "leftValue": "={{ $json.file_id }}",
+              "rightValue": "none",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        736,
+        -48
+      ],
+      "id": "93861db8-de94-472c-ae81-5af2efa2816f",
+      "name": "Has File?"
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "fileId": "={{ $('When Executed by Another Workflow').item.json.file_id }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        976,
+        -176
+      ],
+      "id": "e21c2fdd-7c9a-445a-92f7-03da5baa607a",
+      "name": "Download From Telegram",
+      "webhookId": "27a4693c-7868-41b1-9656-267d510ebee3",
+      "credentials": {
+        "telegramApi": {
+          "id": "nr6VlcCoccUPE02J",
+          "name": "Telegram account 3"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "name": "={{ $('When Executed by Another Workflow').item.json.file_name || 'uploaded_file' }}",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "1IUZpI9aXjc5qkhlzQw-MyMlIFcWCG0e1",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1216,
+        -256
+      ],
+      "id": "c53bd332-a9d6-4acd-ad7a-b788c916a917",
+      "name": "Upload To Drive",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "i0aqnbk3lvhXthkm",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const fileName = $input.item.json.name || $input.item.json.title || 'file';\nconst link = $input.item.json.webViewLink || $input.item.json.webContentLink || '';\nlet response = 'Uploaded \"' + fileName + '\" to Drive ✓';\nif (link) response += '\\nLink: ' + link;\nreturn { json: { output: response } };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1456,
+        -256
+      ],
+      "id": "1add117d-24a5-41fa-91ea-bc49811dcc5a",
+      "name": "Format Upload Result"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const fileName = $('When Executed by Another Workflow').item.json.file_name || 'file';\nreturn { json: { output: `Couldn't download \"${fileName}\" from Telegram — file might be expired or too large. Try sending it again.` } };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1216,
+        -96
+      ],
+      "id": "7223dcf7-542f-4ab4-8d07-deb6b7f4a192",
+      "name": "Download Error"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $('When Executed by Another Workflow').item.json.Text }}",
+        "options": {
+          "systemMessage": "=You are a Google Drive management assistant. You handle file operations EXCEPT uploads (uploads are handled automatically before you).\n\nCurrent: {{ $now.setZone('Asia/Kolkata').format('yyyy-MM-dd HH:mm:ss') }} IST\n\n=== TOOLS ===\nDelete_File → Delete a file. Requires: File_ID.\nUpdate_File → Rename or update file metadata. Requires: File_ID.\nDownload_File → Download a file. Requires: File_ID.\n\n=== HOW TO GET FILE IDs ===\nFrom Google Drive URL: https://drive.google.com/file/d/XXXXX/view → File_ID = XXXXX\nFrom Docs URL: https://docs.google.com/document/d/XXXXX/edit → File_ID = XXXXX\nFrom user giving raw ID → use directly.\nIf user gives ONLY a file name with no URL/ID → ask for the link.\nNEVER guess a File_ID.\n\n=== RULES ===\n1. ACT IMMEDIATELY. No confirmation.\n2. Extract File_ID from URLs automatically.\n3. Reuse File_ID from memory for follow-up requests.\n4. If user wants to upload a file, say: \"Send me the file and I'll upload it to Drive.\"\n5. Respond in under 15 words after actions.\n\n=== RESPONSES ===\nDeleted \"report.pdf\" from Drive ✓\nRenamed to \"Q3 Report.pdf\" ✓\nDownloaded \"presentation.pptx\" ✓"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        976,
+        112
+      ],
+      "id": "f8fb6ea7-89fb-4a65-8abf-645fbef77286",
+      "name": "Drive Agent"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-5-mini"
+        },
+        "builtInTools": {},
+        "options": {
+          "temperature": 0.05
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        864,
+        304
+      ],
+      "id": "fe171d57-7d6b-460f-b94a-9ac94868b176",
+      "name": "GPT 5-mini Drive",
+      "credentials": {
+        "openAiApi": {
+          "id": "EbPfZvscveKnxoX8",
+          "name": "OpenAi account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('When Executed by Another Workflow').item.json['Session ID'] }}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        1008,
+        304
+      ],
+      "id": "5a5c9ea4-a444-4c6f-988f-598bab80402f",
+      "name": "Simple Memory"
+    },
+    {
+      "parameters": {
+        "operation": "deleteFile",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('File_ID', 'Google Drive file ID. Extract from URL between /d/ and /view or /edit. NEVER guess.', 'string') }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDriveTool",
+      "typeVersion": 3,
+      "position": [
+        1136,
+        304
+      ],
+      "id": "46d3f017-fb91-45b3-a238-c6146578fb61",
+      "name": "Delete_File",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "i0aqnbk3lvhXthkm",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('File_ID', 'Google Drive file ID to update. NEVER guess.', 'string') }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDriveTool",
+      "typeVersion": 3,
+      "position": [
+        1280,
+        304
+      ],
+      "id": "22c11f03-567b-4823-8ace-31eec6654caa",
+      "name": "Update_File",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "i0aqnbk3lvhXthkm",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('File_ID', 'Google Drive file ID to download. NEVER guess.', 'string') }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDriveTool",
+      "typeVersion": 3,
+      "position": [
+        1424,
+        304
+      ],
+      "id": "b53f34a7-56e7-4fae-a2b5-6f40c049f085",
+      "name": "Download_File",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "i0aqnbk3lvhXthkm",
+          "name": "Google Drive account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Has File?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has File?": {
+      "main": [
+        [
+          {
+            "node": "Download From Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Drive Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download From Telegram": {
+      "main": [
+        [
+          {
+            "node": "Upload To Drive",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Download Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload To Drive": {
+      "main": [
+        [
+          {
+            "node": "Format Upload Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GPT 5-mini Drive": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Drive Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "Drive Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete_File": {
+      "ai_tool": [
+        [
+          {
+            "node": "Drive Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update_File": {
+      "ai_tool": [
+        [
+          {
+            "node": "Drive Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download_File": {
+      "ai_tool": [
+        [
+          {
+            "node": "Drive Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "12a51e7f-e701-431e-9dd5-572ed0b5e59c",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "d8d542fa04d8b4edae4747c08c0777b8d5a665f45b24665e01e455e752d9c276"
+  },
+  "id": "PkxGb8eYzymL9C30",
+  "tags": []
+}

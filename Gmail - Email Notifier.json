@@ -1,0 +1,1030 @@
+{
+  "name": "Gmail - Email Notifier",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyX",
+              "value": 5,
+              "unit": "minutes"
+            }
+          ]
+        },
+        "filters": {
+          "q": "-category:promotions -category:social -category:updates -in:spam -in:trash"
+        }
+      },
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -2064,
+        -96
+      ],
+      "id": "8cbd02ad-4cfa-4234-91da-d044700b94fe",
+      "name": "New Personal Email",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "gRhODzLcUX88sjLS",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const email = $json;\nconst emailId = email.id || '';\nconst threadId = email.threadId || '';\nconst fromRaw = email.from || 'Unknown';\nconst subject = email.subject || '(no subject)';\nconst snippet = (email.snippet || '').slice(0, 500);\nconst dateStr = email.date || new Date().toISOString();\n\nlet senderName = 'Unknown';\nlet senderEmail = 'Unknown';\nconst match = fromRaw.match(/^(.+?)\\s*<(.+?)>/);\nif (match) {\n  senderName = match[1].trim().replace(/\"/g, '');\n  senderEmail = match[2].trim();\n} else {\n  senderEmail = fromRaw.trim();\n  senderName = senderEmail.includes('@') ? senderEmail.split('@')[0] : senderEmail;\n}\n\nconst notifyText = `📬 New Email\\n\\nFrom: ${senderName} <${senderEmail}>\\nSubject: ${subject}\\n\\n${snippet}${snippet.length >= 500 ? '...' : ''}`;\n\nreturn {\n  json: {\n    emailId,\n    threadId,\n    senderName,\n    senderEmail,\n    subject,\n    snippet,\n    dateStr,\n    notifyText\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1840,
+        -96
+      ],
+      "id": "fc529632-8a6f-4f0e-a6dc-5155593d11b8",
+      "name": "Extract Fields"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const d = $json;\nreturn {\n  json: {\n    emailId: d.emailId,\n    threadId: d.threadId,\n    senderName: d.senderName,\n    senderEmail: d.senderEmail,\n    subject: d.subject,\n    snippet: d.snippet,\n    dateStr: d.dateStr,\n    status: 'unread',\n    timestamp: new Date().toISOString()\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1616,
+        32
+      ],
+      "id": "21c43fa0-903e-4b5a-bdd7-d826e0222af8",
+      "name": "Prep DB Entry"
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "collection": "email_notifications",
+        "fields": "emailId,threadId,senderName,senderEmail,subject,snippet,dateStr,status,timestamp",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.2,
+      "position": [
+        -1392,
+        32
+      ],
+      "id": "fe62d79b-451e-4438-84ac-5d12c48f07c4",
+      "name": "Save to DB",
+      "credentials": {
+        "mongoDb": {
+          "id": "MLdBOJwxchOTO5qK",
+          "name": "MongoDB account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const d = $node['Extract Fields'].json;\nreturn {\n  json: {\n    user_id: 6582818644,\n    chat_id: 6582818644,\n    user_input: '[SYSTEM]',\n    agent_output: `[EMAIL_ALERT] New email from ${d.senderName} <${d.senderEmail}> | Subject: ${d.subject} | ID: ${d.emailId} | Thread: ${d.threadId} | Snippet: ${d.snippet}`,\n    message_type: 'system_email_alert',\n    timestamp: new Date().toISOString()\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1616,
+        192
+      ],
+      "id": "9634e529-f009-4eab-a928-59e99720da78",
+      "name": "Prep Chat History Entry"
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "collection": "Conversations",
+        "fields": "user_id,chat_id,user_input,agent_output,message_type,timestamp",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.2,
+      "position": [
+        -1392,
+        192
+      ],
+      "id": "7fcc4a66-3364-460e-8806-5666ce9cc7c6",
+      "name": "Inject into Chat History",
+      "credentials": {
+        "mongoDb": {
+          "id": "MLdBOJwxchOTO5qK",
+          "name": "MongoDB account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "sendAndWait",
+        "chatId": "6582818644",
+        "message": "={{ $node['Extract Fields'].json.notifyText }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -1168,
+        -96
+      ],
+      "id": "c8de4a90-b3aa-4684-9a59-77fd17d7ee5d",
+      "name": "Notify and Wait",
+      "webhookId": "notifier-webhook-1",
+      "credentials": {
+        "telegramApi": {
+          "id": "nr6VlcCoccUPE02J",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "reply-check",
+              "leftValue": "={{ $json.data }}",
+              "rightValue": "reply",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -944,
+        -96
+      ],
+      "id": "b0c5d64c-a2ac-4f79-8401-31406dc72553",
+      "name": "User Chose Reply?"
+    },
+    {
+      "parameters": {
+        "operation": "delete"
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -720,
+        80
+      ],
+      "id": "b1f4d4f0-d67a-4ba2-9a3c-7f5e9a6106fc",
+      "name": "Delete Notification (Dismiss)",
+      "webhookId": "c102745d-afee-4864-a41d-81a38a245c7d",
+      "credentials": {
+        "telegramApi": {
+          "id": "nr6VlcCoccUPE02J",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "messageId": "={{ $node['Extract Fields'].json.emailId }}"
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        -720,
+        -208
+      ],
+      "id": "46948cff-d5a8-4242-ab04-4926d5d61eae",
+      "name": "Get Full Email",
+      "webhookId": "9f7ee339-f97d-4737-b243-9227545a94c7",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "gRhODzLcUX88sjLS",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const email = $json;\nconst fields = $node['Extract Fields'].json;\n\nconst fullBody = email.textPlain || email.snippet || fields.snippet || '';\n\nreturn {\n  json: {\n    emailId: fields.emailId,\n    threadId: fields.threadId,\n    senderName: fields.senderName,\n    senderEmail: fields.senderEmail,\n    subject: fields.subject,\n    fullBody: fullBody.substring(0, 3000),\n    snippet: fields.snippet\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -496,
+        -208
+      ],
+      "id": "7ac514ba-ee3e-4510-a95e-5f07ab894522",
+      "name": "Prep Email Context"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Draft a reply to this email.\n\nFrom: {{ $json.senderName }} <{{ $json.senderEmail }}>\nSubject: {{ $json.subject }}\n\nFull email body:\n{{ $json.fullBody }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You are a professional email drafting assistant.\n\nYour job is to compose a well-written reply email based on the incoming email content.\n\nGuidelines:\n- Write in clear, professional English\n- Match the tone of the incoming email (formal if formal, friendly if friendly)\n- Be concise but thorough\n- Address the key points raised in the original email\n- Sign off appropriately\n- Do NOT include the original email text in your reply\n- Do NOT add placeholder text like [Your Name] — just end with a warm closing\n- The reply should be ready to send as-is\n\nOutput a JSON with:\n- subject: the reply subject line (usually Re: original subject)\n- body: the full reply email body text (plain text, not HTML)"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -336,
+        -208
+      ],
+      "id": "cbb788dc-c528-4e6e-a1da-760d04d2ef96",
+      "name": "Draft Reply Agent"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        -352,
+        -16
+      ],
+      "id": "28d2368a-e927-43ed-b953-ef75811f93e8",
+      "name": "GPT-4o-mini Draft",
+      "credentials": {
+        "openAiApi": {
+          "id": "EbPfZvscveKnxoX8",
+          "name": "OpenAi account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n  \"subject\": \"Re: Meeting Tomorrow\",\n  \"body\": \"Hi John, thanks for reaching out. I'd be happy to meet tomorrow at 3pm. Looking forward to it. Best regards\"\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        -192,
+        32
+      ],
+      "id": "6782d4db-1f18-47c2-8c2d-1165f163a1b2",
+      "name": "Draft Output Parser"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const draft = $json.output || $json;\nconst ctx = $node['Prep Email Context'].json;\n\nconst draftSubject = draft.subject || `Re: ${ctx.subject}`;\nconst draftBody = draft.body || '';\n\nconst previewText = `📧 Draft Ready\\n\\nTo: ${ctx.senderName} <${ctx.senderEmail}>\\nSubject: ${draftSubject}\\n\\n---\\n${draftBody}\\n---`;\n\nreturn {\n  json: {\n    previewText,\n    draftSubject,\n    draftBody,\n    emailId: ctx.emailId,\n    threadId: ctx.threadId,\n    senderName: ctx.senderName,\n    senderEmail: ctx.senderEmail,\n    originalSubject: ctx.subject,\n    fullBody: ctx.fullBody\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -48,
+        -208
+      ],
+      "id": "bd75e5d8-d539-4202-95bb-26638872b87d",
+      "name": "Format Draft Preview"
+    },
+    {
+      "parameters": {
+        "operation": "sendAndWait",
+        "chatId": "6582818644",
+        "message": "={{ $json.previewText }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        192,
+        -208
+      ],
+      "id": "0b6b1161-162d-4316-ae28-c035b60e4ed5",
+      "name": "Show Draft and Wait",
+      "webhookId": "notifier-webhook-draft",
+      "credentials": {
+        "telegramApi": {
+          "id": "nr6VlcCoccUPE02J",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "sw-send",
+                    "leftValue": "={{ $json.data }}",
+                    "rightValue": "send",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Send"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "sw-edit",
+                    "leftValue": "={{ $json.data }}",
+                    "rightValue": "edit",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Edit"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "sw-cancel",
+                    "leftValue": "={{ $json.data }}",
+                    "rightValue": "cancel",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Cancel"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        416,
+        -208
+      ],
+      "id": "23badc08-0558-40de-bc40-410de0700e33",
+      "name": "Draft Action Switch"
+    },
+    {
+      "parameters": {
+        "operation": "reply",
+        "messageId": "={{ $node['Prep Email Context'].json.emailId }}",
+        "message": "={{ $node['Format Draft Preview'].json.draftBody }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        640,
+        -368
+      ],
+      "id": "a2ec8c92-8584-4b33-9dd5-d4055af7c676",
+      "name": "Send Reply via Gmail",
+      "webhookId": "42d17e23-e529-49fb-a422-ff66d27dda14",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "gRhODzLcUX88sjLS",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "delete"
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        864,
+        -368
+      ],
+      "id": "ea2e5a9d-9e1b-4442-a1de-8752915ae95a",
+      "name": "Delete Draft Msg (Sent)",
+      "webhookId": "8a91671a-d8aa-46c8-9b64-ef9416798fad",
+      "credentials": {
+        "telegramApi": {
+          "id": "nr6VlcCoccUPE02J",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "6582818644",
+        "text": "✅ Reply sent!",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1088,
+        -368
+      ],
+      "id": "fb646cfa-8c01-4f93-ab8f-f80244679717",
+      "name": "Confirm Sent",
+      "webhookId": "972d8dd2-9e59-4fef-9e28-438aebfff6bc",
+      "credentials": {
+        "telegramApi": {
+          "id": "nr6VlcCoccUPE02J",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "collection": "email_notifications",
+        "updateKey": "emailId",
+        "fields": "emailId,status",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.2,
+      "position": [
+        1392,
+        -368
+      ],
+      "id": "8ff00590-2b8d-4bfd-92eb-3aa2b63a289d",
+      "name": "Mark Replied in DB",
+      "credentials": {
+        "mongoDb": {
+          "id": "MLdBOJwxchOTO5qK",
+          "name": "MongoDB account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "return {\n  json: {\n    emailId: $node['Prep Email Context'].json.emailId,\n    status: 'replied'\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1232,
+        -368
+      ],
+      "id": "7b9ed127-ab86-466f-b505-e4ab292cd8d7",
+      "name": "Prep Replied Status"
+    },
+    {
+      "parameters": {
+        "operation": "delete"
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        640,
+        -48
+      ],
+      "id": "984637e1-4f71-46cf-a018-c378b821e6d9",
+      "name": "Delete Draft Msg (Cancel)",
+      "webhookId": "1a0c2a29-2585-4d4d-82ba-74ff0b1b6451",
+      "credentials": {
+        "telegramApi": {
+          "id": "nr6VlcCoccUPE02J",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "6582818644",
+        "text": "Draft cancelled ✓",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        864,
+        -48
+      ],
+      "id": "0560dc32-a9a0-45f3-879e-2635b8ae57c4",
+      "name": "Confirm Cancel",
+      "webhookId": "e5f075c9-f3d0-46af-9271-2b9ecf6497ec",
+      "credentials": {
+        "telegramApi": {
+          "id": "nr6VlcCoccUPE02J",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "delete"
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        640,
+        -208
+      ],
+      "id": "1099f2e4-5147-4062-909b-8bcc07c8e461",
+      "name": "Delete Old Draft Msg",
+      "webhookId": "27e89f2b-6b06-439e-87f9-626089a784d1",
+      "credentials": {
+        "telegramApi": {
+          "id": "nr6VlcCoccUPE02J",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "sendAndWait",
+        "chatId": "6582818644",
+        "message": "What changes do you want in the draft?",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        864,
+        -208
+      ],
+      "id": "8a5fa2c2-4d28-4947-bdc7-e8dc53c79d15",
+      "name": "Ask for Edits",
+      "webhookId": "notifier-webhook-edits",
+      "credentials": {
+        "telegramApi": {
+          "id": "nr6VlcCoccUPE02J",
+          "name": "Telegram account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Revise this email draft based on the user's feedback.\n\nOriginal email being replied to:\nFrom: {{ $node['Prep Email Context'].json.senderName }} <{{ $node['Prep Email Context'].json.senderEmail }}>\nSubject: {{ $node['Prep Email Context'].json.subject }}\nBody: {{ $node['Prep Email Context'].json.fullBody }}\n\nCurrent draft:\nSubject: {{ $node['Format Draft Preview'].json.draftSubject }}\nBody: {{ $node['Format Draft Preview'].json.draftBody }}\n\nUser's edit request:\n{{ $json.data }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You are a professional email drafting assistant.\n\nThe user wants to edit a draft email reply. Apply their requested changes while keeping the email professional and well-written.\n\nGuidelines:\n- Apply the user's changes precisely\n- Maintain professional tone unless told otherwise\n- Keep the email concise\n- Do NOT add placeholder text\n- The reply should be ready to send as-is\n\nOutput a JSON with:\n- subject: the reply subject line\n- body: the full revised reply email body text (plain text)"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1072,
+        -208
+      ],
+      "id": "b1eaa25c-959e-4d15-b026-d548c2aab07a",
+      "name": "Edit Draft Agent"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        1040,
+        16
+      ],
+      "id": "4f76616e-accb-4a9f-b1cc-6a93449e5ca7",
+      "name": "GPT-4o-mini Edit",
+      "credentials": {
+        "openAiApi": {
+          "id": "EbPfZvscveKnxoX8",
+          "name": "OpenAi account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n  \"subject\": \"Re: Meeting Tomorrow\",\n  \"body\": \"Hi John, thanks for reaching out. I'd be happy to meet tomorrow at 3pm. Looking forward to it. Best regards\"\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        1184,
+        16
+      ],
+      "id": "34113205-f979-48f4-8117-b9238ec28256",
+      "name": "Edit Output Parser"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const draft = $json.output || $json;\nconst ctx = $node['Prep Email Context'].json;\n\nconst draftSubject = draft.subject || `Re: ${ctx.subject}`;\nconst draftBody = draft.body || '';\n\nconst previewText = `📧 Revised Draft\\n\\nTo: ${ctx.senderName} <${ctx.senderEmail}>\\nSubject: ${draftSubject}\\n\\n---\\n${draftBody}\\n---`;\n\nreturn {\n  json: {\n    previewText,\n    draftSubject,\n    draftBody,\n    emailId: ctx.emailId,\n    threadId: ctx.threadId,\n    senderName: ctx.senderName,\n    senderEmail: ctx.senderEmail,\n    originalSubject: ctx.subject,\n    fullBody: ctx.fullBody\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1376,
+        -208
+      ],
+      "id": "3c329850-dc26-4aee-9afc-3e73856a3111",
+      "name": "Format Edited Draft"
+    },
+    {
+      "parameters": {
+        "operation": "delete"
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -720,
+        -368
+      ],
+      "id": "35b50425-5df5-4105-af03-90fe31e7b000",
+      "name": "Delete Notification (Reply)",
+      "webhookId": "a689cc1d-cb0f-43ef-be60-818872fb7c9b",
+      "credentials": {
+        "telegramApi": {
+          "id": "nr6VlcCoccUPE02J",
+          "name": "Telegram account 3"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "New Personal Email": {
+      "main": [
+        [
+          {
+            "node": "Extract Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Fields": {
+      "main": [
+        [
+          {
+            "node": "Prep DB Entry",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Prep Chat History Entry",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Notify and Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prep DB Entry": {
+      "main": [
+        [
+          {
+            "node": "Save to DB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prep Chat History Entry": {
+      "main": [
+        [
+          {
+            "node": "Inject into Chat History",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify and Wait": {
+      "main": [
+        [
+          {
+            "node": "User Chose Reply?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "User Chose Reply?": {
+      "main": [
+        [
+          {
+            "node": "Delete Notification (Reply)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Delete Notification (Dismiss)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete Notification (Reply)": {
+      "main": [
+        [
+          {
+            "node": "Get Full Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Full Email": {
+      "main": [
+        [
+          {
+            "node": "Prep Email Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prep Email Context": {
+      "main": [
+        [
+          {
+            "node": "Draft Reply Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Draft Reply Agent": {
+      "main": [
+        [
+          {
+            "node": "Format Draft Preview",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GPT-4o-mini Draft": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Draft Reply Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Draft Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Draft Reply Agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Draft Preview": {
+      "main": [
+        [
+          {
+            "node": "Show Draft and Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Show Draft and Wait": {
+      "main": [
+        [
+          {
+            "node": "Draft Action Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Draft Action Switch": {
+      "main": [
+        [
+          {
+            "node": "Send Reply via Gmail",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Delete Old Draft Msg",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Delete Draft Msg (Cancel)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Reply via Gmail": {
+      "main": [
+        [
+          {
+            "node": "Delete Draft Msg (Sent)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete Draft Msg (Sent)": {
+      "main": [
+        [
+          {
+            "node": "Confirm Sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Confirm Sent": {
+      "main": [
+        [
+          {
+            "node": "Prep Replied Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prep Replied Status": {
+      "main": [
+        [
+          {
+            "node": "Mark Replied in DB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete Draft Msg (Cancel)": {
+      "main": [
+        [
+          {
+            "node": "Confirm Cancel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete Old Draft Msg": {
+      "main": [
+        [
+          {
+            "node": "Ask for Edits",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ask for Edits": {
+      "main": [
+        [
+          {
+            "node": "Edit Draft Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Draft Agent": {
+      "main": [
+        [
+          {
+            "node": "Format Edited Draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GPT-4o-mini Edit": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Edit Draft Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Edit Draft Agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Edited Draft": {
+      "main": [
+        [
+          {
+            "node": "Show Draft and Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "a2486697-b951-4020-9326-4d4327c9b587",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "d8d542fa04d8b4edae4747c08c0777b8d5a665f45b24665e01e455e752d9c276"
+  },
+  "id": "bbL49LtBM7CKMqoM",
+  "tags": []
+}
