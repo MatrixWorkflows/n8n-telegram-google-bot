@@ -101,14 +101,7 @@ This project embodies Anthropic's values:
 
 ## 📸 Demo
 
-### Email Management
-![Email Demo](screenshots/email-demo.gif)
-
-### Calendar Scheduling
-![Calendar Demo](screenshots/calendar-demo.gif)
-
-### Document Processing
-![Docs Demo](screenshots/docs-demo.gif)
+Check out dem's Uploaded in same repo
 
 ---
 
